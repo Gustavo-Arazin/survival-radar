@@ -24,6 +24,7 @@
 
   // ---------- mapa ----------
   const map = L.map('map', { zoomControl: true }).setView([-15.78, -47.93], 4);
+  window.__srMap = map;
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; colaboradores do OpenStreetMap',
@@ -31,25 +32,9 @@
   const layer = L.layerGroup().addTo(map);
   map.on('click', (e) => analyze(e.latlng.lat, e.latlng.lng, null));
 
-  // ---------- perfil ----------
-  const profileFields = ['pAdults', 'pInfants', 'pKids', 'pElderly', 'pMobility', 'pMeds', 'pCar', 'pPets'];
-  function readProfile() {
-    const n = (id) => Math.max(0, parseInt($(id).value, 10) || 0);
-    return {
-      adults: n('pAdults'), infants: n('pInfants'), kids: n('pKids'), elderly: n('pElderly'),
-      mobility: $('pMobility').checked, meds: $('pMeds').checked, car: $('pCar').checked, pets: $('pPets').checked,
-    };
-  }
-  function loadProfile() {
-    const p = store.get(PROFILE_KEY, null);
-    if (!p) return;
-    $('pAdults').value = p.adults; $('pInfants').value = p.infants; $('pKids').value = p.kids; $('pElderly').value = p.elderly;
-    $('pMobility').checked = !!p.mobility; $('pMeds').checked = !!p.meds; $('pCar').checked = !!p.car; $('pPets').checked = !!p.pets;
-  }
-  profileFields.forEach((id) => $(id).addEventListener('change', () => {
-    store.set(PROFILE_KEY, readProfile());
-    if (current) { rescore(); }
-  }));
+  // ---------- perfil (vem do Plano da casa) ----------
+  const readProfile = () => (window.SR_HOUSE_PROFILE ? window.SR_HOUSE_PROFILE() : {});
+  window.addEventListener('sr-house-changed', () => { if (current) rescore(); });
 
   // ---------- status ----------
   function status(msg) {
@@ -307,7 +292,6 @@
     }
   }
 
-  loadProfile();
   renderSaved();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

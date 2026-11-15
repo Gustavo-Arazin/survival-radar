@@ -3,7 +3,7 @@ const SHELL = 'sr-shell-v1';
 const TILES = 'sr-tiles-v1';
 const MAX_TILES = 600;
 const ASSETS = [
-  './', 'index.html', 'styles.css', 'app.js', 'rules.js', 'manifest.webmanifest', 'icon.svg',
+  './', 'index.html', 'styles.css', 'app.js', 'rules.js', 'plan.js', 'planui.js', 'manifest.webmanifest', 'icon.svg',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];
