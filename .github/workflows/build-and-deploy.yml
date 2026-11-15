@@ -47,7 +47,6 @@ jobs:
             nwr/amenity=hospital,fire_station,police,clinic,pharmacy,fuel \
             nwr/healthcare=hospital,emergency,clinic \
             nwr/emergency=ambulance_station,assembly_point \
-            nwr/social_facility=shelter \
             nwr/industrial=refinery,oil,petrochemical,chemical,fuel_depot,gas,gas_storage,oil_storage \
             nwr/man_made=works,storage_tank,pipeline,dam \
             nwr/power=plant,substation \

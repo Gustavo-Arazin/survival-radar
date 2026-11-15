@@ -58,10 +58,10 @@
     fire:      { label: 'Bombeiros', group: 'service', color: '#ffc53d' },
     police:    { label: 'Polícia', group: 'service', color: '#3e63dd' },
     ambulance: { label: 'Bases de ambulância', group: 'service', color: '#e54666' },
-    shelter:   { label: 'Abrigos e pontos de encontro', group: 'service', color: '#30a46c' },
+    shelter:   { label: 'Pontos de encontro de emergência', group: 'service', color: '#30a46c' },
     pharmacy:  { label: 'Farmácias', group: 'service', color: '#12a594' },
     fuel:      { label: 'Postos de combustível', group: 'service', color: '#8e8c99' },
-    refinery:  { label: 'Refinarias e petroquímicas', group: 'infra', color: '#9d174d' },
+    refinery:  { label: 'Refinarias, petróleo e petroquímicas', group: 'infra', color: '#9d174d' },
     chemical:  { label: 'Indústria química', group: 'infra', color: '#a21caf' },
     fuel_depot:{ label: 'Depósitos de combustível e gás', group: 'infra', color: '#c2410c' },
     pipeline:  { label: 'Dutos de gás e óleo', group: 'infra', color: '#b45309' },
@@ -73,6 +73,11 @@
     dam:       { label: 'Barragens', group: 'infra', color: '#0369a1' },
   };
 
+  const SINGULAR = { hospital: 'Hospital', emergency: 'Pronto atendimento', fire: 'Bombeiros', police: 'Polícia', ambulance: 'Base de ambulância',
+    shelter: 'Ponto de encontro', pharmacy: 'Farmácia', fuel: 'Posto de combustível', refinery: 'Instalação de petróleo', chemical: 'Indústria química',
+    fuel_depot: 'Depósito de combustível ou gás', pipeline: 'Duto', nuclear: 'Usina nuclear', power_plant: 'Usina de energia', substation: 'Subestação',
+    airport: 'Aeródromo', military: 'Área militar', dam: 'Barragem' };
+
   function classify(t) {
     if (!t) return null;
     const name = t.name || '';
@@ -82,7 +87,7 @@
     if (t.amenity === 'fire_station') return 'fire';
     if (t.amenity === 'police') return 'police';
     if (t.emergency === 'ambulance_station') return 'ambulance';
-    if (t.social_facility === 'shelter' || t.emergency === 'assembly_point') return 'shelter';
+    if (t.emergency === 'assembly_point') return 'shelter';
     if (t.amenity === 'pharmacy') return 'pharmacy';
     if (t.amenity === 'fuel') return 'fuel';
     if (t.man_made === 'pipeline' && /gas|oil|fuel|petro|naphtha|diesel/i.test(t.substance || t.type || '')) return 'pipeline';
@@ -110,7 +115,6 @@
   nwr(around:${r},${c})[amenity=clinic][emergency=yes];
   nwr(around:${r},${c})[amenity=clinic][name~"UPA|AMA|Pronto|Emerg",i];
   nwr(around:${r},${c})[emergency~"^(ambulance_station|assembly_point)$"];
-  nwr(around:${r},${c})[social_facility=shelter];
   nwr(around:${near},${c})[amenity~"^(pharmacy|fuel)$"];
   nwr(around:15000,${c})[industrial~"^(refinery|oil|petrochemical|chemical|fuel_depot|gas|gas_storage|oil_storage)$"];
   nwr(around:15000,${c})[man_made=works][product~"oil|petro",i];
@@ -148,7 +152,7 @@ way(around:3000,${c})[man_made=pipeline]->.p;
         if (lat == null || lon == null) continue;
         dist = haversine(origin, { lat, lon });
       }
-      const name = t.name || t.operator || t['name:pt'] || CATEGORIES[cat].label.replace(/s$/, '');
+      const name = t.name || t.operator || t['name:pt'] || SINGULAR[cat];
       const key = cat + '|' + name.toLowerCase() + '|' + Math.round(lat * 1000) + '|' + Math.round(lon * 1000);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -208,7 +212,7 @@ way(around:3000,${c})[man_made=pipeline]->.p;
       if (!(dist <= radiusFor(cat, serviceRadius))) continue;
       (out[cat] = out[cat] || []).push({
         cat, lat, lon, dist,
-        name: r[3] || CATEGORIES[cat].label.replace(/s$/, ''),
+        name: r[3] || SINGULAR[cat],
         phone: r[4] || null, address: r[5] || null, emergency: r[6] === 1, osm: r[7],
       });
     }
