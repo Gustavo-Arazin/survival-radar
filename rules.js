@@ -165,6 +165,57 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     return out;
   }
 
+  // Raio de busca por categoria (m). Serviços usam o raio escolhido pelo usuário.
+  function radiusFor(cat, serviceRadius) {
+    const fixed = { pharmacy: Math.min(3000, serviceRadius), fuel: Math.min(3000, serviceRadius),
+      refinery: 15000, chemical: 15000, fuel_depot: 15000, pipeline: 3000, nuclear: 40000,
+      power_plant: 5000, substation: 1000, airport: 15000, military: 10000, dam: 30000 };
+    return fixed[cat] != null ? fixed[cat] : serviceRadius;
+  }
+  const MAX_RADIUS = 40000;
+
+  // Blocos de 0,5° que cobrem o círculo de raio maxR.
+  function tilesFor(lat, lon, maxR, tile) {
+    tile = tile || 0.5;
+    const dLat = maxR / 111320;
+    const dLon = maxR / (111320 * Math.max(0.2, Math.cos(toRad(lat))));
+    const keys = [];
+    for (let y = Math.floor((lat - dLat + 90) / tile); y <= Math.floor((lat + dLat + 90) / tile); y++)
+      for (let x = Math.floor((lon - dLon + 180) / tile); x <= Math.floor((lon + dLon + 180) / tile); x++)
+        keys.push(`${y}_${x}`);
+    return keys;
+  }
+
+  // Linhas dos blocos estáticos -> mesmo formato de parseOverpass.
+  function fromTiles(rows, origin, serviceRadius, cats) {
+    const out = {};
+    const seen = new Set();
+    for (const r of rows) {
+      const cat = cats[r[0]];
+      if (!cat || !CATEGORIES[cat]) continue;
+      const key = cat + '|' + r[7];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      let lat = r[1], lon = r[2], dist;
+      if (cat === 'pipeline') {
+        dist = Infinity;
+        for (const l of r[8] || []) {
+          const pts = l.map(([a, b]) => ({ lat: a, lon: b }));
+          const d = distToPolyline(origin, pts);
+          if (d < dist) { dist = d; const mid = pts[Math.floor(pts.length / 2)]; lat = mid.lat; lon = mid.lon; }
+        }
+      } else dist = haversine(origin, { lat, lon });
+      if (!(dist <= radiusFor(cat, serviceRadius))) continue;
+      (out[cat] = out[cat] || []).push({
+        cat, lat, lon, dist,
+        name: r[3] || CATEGORIES[cat].label.replace(/s$/, ''),
+        phone: r[4] || null, address: r[5] || null, emergency: r[6] === 1, osm: r[7],
+      });
+    }
+    for (const k of Object.keys(out)) out[k].sort((a, b) => a.dist - b.dist);
+    return out;
+  }
+
   const LEVEL_RANK = { alto: 3, moderado: 2, baixo: 1, info: 0 };
 
   function fmtDist(m) {
@@ -304,7 +355,7 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     ].join('\n');
   }
 
-  const api = { haversine, distToSegment, distToPolyline, point, median, classify, buildOverpassQuery, parseOverpass, evaluate, recommend, reportText, aiBriefing, fmtDist, CATEGORIES, LEVEL_RANK };
+  const api = { haversine, distToSegment, distToPolyline, point, median, classify, buildOverpassQuery, parseOverpass, radiusFor, tilesFor, fromTiles, MAX_RADIUS, evaluate, recommend, reportText, aiBriefing, fmtDist, CATEGORIES, LEVEL_RANK };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SR = api;
 })(typeof self !== 'undefined' ? self : this);

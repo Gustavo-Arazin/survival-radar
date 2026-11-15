@@ -90,6 +90,22 @@
     throw lastErr || new Error('Overpass indisponível');
   }
 
+  // Base nacional pré-processada (blocos estáticos servidos com o site).
+  let dataIndex;
+  async function loadIndex() {
+    if (dataIndex !== undefined) return dataIndex;
+    try { dataIndex = await fetchJSON('data/index.json', {}, 15000); } catch { dataIndex = null; }
+    return dataIndex;
+  }
+  async function localItems(lat, lon, radius) {
+    const idx = await loadIndex();
+    if (!idx) return null;
+    const have = new Set(idx.tiles);
+    const keys = SR.tilesFor(lat, lon, SR.MAX_RADIUS, idx.tile).filter((k) => have.has(k));
+    const parts = await Promise.all(keys.map((k) => fetchJSON(`data/t/${k}.json`, {}, 30000).catch(() => [])));
+    return { items: SR.fromTiles(parts.flat(), { lat, lon }, radius, idx.cats), built: idx.built };
+  }
+
   async function elevation(lat, lon) {
     const pts = [{ lat, lon }];
     for (let b = 0; b < 360; b += 45) pts.push(SR.point(lat, lon, 600, b));
@@ -151,20 +167,24 @@
     map.setView([lat, lon], radius > 10000 ? 11 : 13);
     L.circle([lat, lon], { radius, color: '#7c8cff', weight: 1, fillOpacity: 0.04 }).addTo(layer);
     L.marker([lat, lon]).addTo(layer);
-    status('Consultando serviços, infraestrutura e relevo (pode levar até 1 minuto)…');
+    status('Consultando serviços, infraestrutura e relevo…');
     $('report').hidden = true;
 
-    const [ov, el, addr] = await Promise.allSettled([
-      overpass(SR.buildOverpassQuery(lat, lon, radius)),
+    const [loc, el, addr] = await Promise.allSettled([
+      localItems(lat, lon, radius),
       elevation(lat, lon),
       address ? Promise.resolve(address) : reverse(lat, lon),
     ]);
-    if (ov.status !== 'fulfilled') {
-      status('Os servidores do OpenStreetMap estão ocupados. Tente de novo em alguns minutos.');
-      return;
+    let items, built = null;
+    if (loc.status === 'fulfilled' && loc.value) {
+      items = loc.value.items; built = loc.value.built;
+    } else {
+      status('Base local indisponível; consultando o OpenStreetMap ao vivo (pode demorar)…');
+      try { items = SR.parseOverpass(await overpass(SR.buildOverpassQuery(lat, lon, radius)), { lat, lon }); }
+      catch { status('Os servidores do OpenStreetMap estão ocupados. Tente de novo em alguns minutos.'); return; }
     }
-    const items = SR.parseOverpass(ov.value, { lat, lon });
     current = {
+      dataBuilt: built,
       name: $('placeName').value.trim() || 'Local',
       address: addr.status === 'fulfilled' ? addr.value : null,
       lat, lon, radius, ts: Date.now(),
@@ -238,6 +258,7 @@
     const q = [];
     const svc = ['hospital', 'emergency', 'fire', 'police'].reduce((s, k) => s + (m.counts[k] || 0), 0);
     q.push(`${svc} serviços de emergência mapeados no raio de ${SR.fmtDist(m.radius)}.`);
+    q.push(m.dataBuilt ? `Base nacional OpenStreetMap atualizada em ${new Date(m.dataBuilt).toLocaleDateString('pt-BR')}.` : 'Dados consultados ao vivo no OpenStreetMap.');
     if (svc < 3) q.push('Poucos serviços mapeados: a cobertura do OpenStreetMap nesta região pode ser fraca. Confirme localmente.');
     q.push(m.elevation ? 'Relevo: dados de altitude obtidos (Open-Meteo, ~90 m de resolução).' : 'Relevo: altitude indisponível nesta consulta.');
     q.push('Hospitais: o mapa não informa se há pronto-socorro 24 h nem especialidade pediátrica. Confirme por telefone.');

@@ -1,0 +1,69 @@
+name: Construir base nacional e publicar
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * 1'   # toda segunda, 04:23 em Brasília
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar osmium
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+
+      - name: Testar regras
+        run: node test/rules.test.js
+
+      - name: Baixar extração do Brasil (Geofabrik)
+        run: curl -fsSL --retry 3 -o brazil.osm.pbf https://download.geofabrik.de/south-america/brazil-latest.osm.pbf && ls -lh brazil.osm.pbf
+
+      - name: Filtrar objetos de interesse
+        run: |
+          osmium tags-filter brazil.osm.pbf \
+            nwr/amenity=hospital,fire_station,police,clinic,pharmacy,fuel \
+            nwr/healthcare=hospital,emergency,clinic \
+            nwr/emergency=ambulance_station,assembly_point \
+            nwr/social_facility=shelter \
+            nwr/industrial=refinery,oil,petrochemical,chemical,fuel_depot,gas,gas_storage,oil_storage \
+            nwr/man_made=works,storage_tank,pipeline,dam \
+            nwr/power=plant,substation \
+            nwr/aeroway=aerodrome \
+            nwr/landuse=military \
+            nwr/military \
+            nwr/waterway=dam \
+            -o filtered.osm.pbf --overwrite
+          osmium export filtered.osm.pbf -f geojsonseq -a type,id -o filtered.geojsonseq --overwrite
+          ls -lh filtered.osm.pbf filtered.geojsonseq
+
+      - name: Gerar blocos estáticos
+        run: |
+          mkdir -p dist
+          cp index.html styles.css app.js rules.js sw.js manifest.webmanifest icon.svg .nojekyll dist/
+          node pipeline/build-tiles.js filtered.geojsonseq dist/data
+          du -sh dist/data
+
+      - name: Publicar no GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          force_orphan: true
+          commit_message: 'Publicação automática (base OSM atualizada)'
