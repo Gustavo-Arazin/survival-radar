@@ -32,7 +32,14 @@ jobs:
         run: node test/rules.test.js
 
       - name: Baixar extração do Brasil (Geofabrik)
-        run: curl -fsSL --retry 3 -o brazil.osm.pbf https://download.geofabrik.de/south-america/brazil-latest.osm.pbf && ls -lh brazil.osm.pbf
+        run: |
+          for url in \
+            https://download.geofabrik.de/south-america/brazil-latest.osm.pbf \
+            https://download.openstreetmap.fr/extracts/south-america/brazil-latest.osm.pbf; do
+            echo "Tentando $url"
+            if curl -fSL --retry 4 --retry-all-errors --retry-delay 20 --connect-timeout 30 -o brazil.osm.pbf "$url"; then break; fi
+          done
+          test -s brazil.osm.pbf && ls -lh brazil.osm.pbf
 
       - name: Filtrar objetos de interesse
         run: |
