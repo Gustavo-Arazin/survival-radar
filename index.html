@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Survival Radar — Brasil</title>
+<meta name="description" content="Mapa de serviços de emergência, riscos e infraestrutura crítica para qualquer endereço do Brasil. Nada é armazenado em servidor.">
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">◎</span>
+    <div>
+      <h1>Survival Radar</h1>
+      <p class="sub">Serviços, riscos e infraestrutura crítica para qualquer endereço do Brasil</p>
+    </div>
+  </div>
+  <span id="netStatus" class="pill">online</span>
+</header>
+
+<main>
+  <section class="panel" id="searchPanel">
+    <form id="searchForm" autocomplete="off">
+      <label for="q">Endereço, CEP ou local</label>
+      <div class="row">
+        <input id="q" name="q" type="search" placeholder="Ex.: Av. Paulista 1000, São Paulo" required>
+        <button type="submit" class="primary">Buscar</button>
+      </div>
+    </form>
+    <div class="row wrap">
+      <button id="gpsBtn" type="button">Usar minha localização</button>
+      <span class="hint">ou toque no mapa para escolher um ponto</span>
+    </div>
+    <ul id="candidates" class="candidates" hidden></ul>
+    <div class="row wrap settings">
+      <label>Raio dos serviços
+        <select id="radius">
+          <option value="5000">5 km</option>
+          <option value="10000" selected>10 km</option>
+          <option value="20000">20 km</option>
+        </select>
+      </label>
+      <label>Nome deste local
+        <input id="placeName" type="text" placeholder="Casa, Trabalho, Creche…" maxlength="40">
+      </label>
+    </div>
+    <details id="profileBox">
+      <summary>Perfil da família (opcional, fica só neste aparelho)</summary>
+      <div class="grid2">
+        <label>Adultos <input type="number" id="pAdults" min="0" max="20" value="2"></label>
+        <label>Crianças com menos de 2 anos <input type="number" id="pInfants" min="0" max="10" value="0"></label>
+        <label>Crianças de 2 a 12 anos <input type="number" id="pKids" min="0" max="10" value="0"></label>
+        <label>Idosos (65+) <input type="number" id="pElderly" min="0" max="10" value="0"></label>
+        <label class="check"><input type="checkbox" id="pMobility"> Alguém com mobilidade reduzida</label>
+        <label class="check"><input type="checkbox" id="pMeds"> Alguém depende de medicação ou equipamento elétrico</label>
+        <label class="check"><input type="checkbox" id="pCar" checked> Família tem carro</label>
+        <label class="check"><input type="checkbox" id="pPets"> Tem animais de estimação</label>
+      </div>
+    </details>
+  </section>
+
+  <div id="map" role="application" aria-label="Mapa"></div>
+
+  <section class="panel" id="statusPanel" hidden>
+    <p id="status"></p>
+  </section>
+
+  <section id="report" hidden>
+    <div class="panel summary">
+      <h2 id="repTitle">Relatório</h2>
+      <p id="repAddress" class="muted"></p>
+      <div id="overall" class="overall"></div>
+      <div class="row wrap actions">
+        <button id="saveBtn" type="button">Salvar neste aparelho</button>
+        <button id="copyBtn" type="button">Copiar relatório</button>
+        <button id="aiBtn" type="button">Copiar briefing para IA</button>
+        <button id="dlBtn" type="button">Baixar (.txt)</button>
+        <button id="printBtn" type="button">Imprimir</button>
+      </div>
+      <p id="actionMsg" class="muted small" aria-live="polite"></p>
+    </div>
+
+    <div class="panel">
+      <h2>Exposição a riscos</h2>
+      <ul id="risks" class="risks"></ul>
+    </div>
+
+    <div class="panel">
+      <h2>Ações recomendadas</h2>
+      <ol id="actionsList"></ol>
+    </div>
+
+    <div class="panel">
+      <h2>Serviços mais próximos</h2>
+      <div id="services"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Infraestrutura crítica no entorno</h2>
+      <div id="infra"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Qualidade dos dados</h2>
+      <ul id="quality" class="small"></ul>
+    </div>
+  </section>
+
+  <section class="panel" id="savedPanel">
+    <h2>Locais salvos neste aparelho</h2>
+    <ul id="savedList" class="saved"></ul>
+    <p class="muted small">Funcionam offline. Nada sai deste aparelho.</p>
+  </section>
+
+  <section class="panel small muted" id="about">
+    <h2>Como funciona e limites</h2>
+    <ul>
+      <li><b>Privacidade:</b> não há servidor nem conta. O texto que você busca vai para o serviço de geocodificação do OpenStreetMap (Nominatim) para virar coordenada. Para não enviar o endereço, use a localização do aparelho ou toque no mapa.</li>
+      <li><b>Fontes:</b> OpenStreetMap (serviços e infraestrutura, via Overpass) e Open-Meteo (altitude). Cobertura desigual: cidades grandes têm dados melhores.</li>
+      <li><b>Distâncias são em linha reta.</b> O tempo real de trajeto aparece ao abrir a rota no Google Maps ou Waze, com trânsito.</li>
+      <li><b>As regras de exposição são heurísticas de planejamento</b>, não laudo técnico. Confirme riscos de alagamento e deslizamento com a Defesa Civil do município (alertas por SMS: envie o CEP para 40199).</li>
+      <li><b>Emergência:</b> SAMU 192 · Bombeiros 193 · Polícia 190 · Defesa Civil 199.</li>
+    </ul>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="rules.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

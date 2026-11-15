@@ -1,0 +1,14 @@
+{
+  "name": "Survival Radar",
+  "short_name": "Radar",
+  "description": "Serviços de emergência, riscos e infraestrutura crítica para qualquer endereço do Brasil.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

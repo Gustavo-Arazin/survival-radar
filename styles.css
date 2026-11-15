@@ -1,0 +1,67 @@
+:root {
+  --bg: #0f1115; --panel: #171a21; --line: #262b36; --text: #e8eaf0; --muted: #9aa3b2;
+  --accent: #7c8cff; --alto: #e5484d; --moderado: #f5a524; --baixo: #30a46c; --info: #6b7280;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); }
+.top { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 1000; }
+.brand { display: flex; gap: 10px; align-items: center; }
+.logo { font-size: 26px; color: var(--accent); }
+h1 { font-size: 18px; margin: 0; }
+h2 { font-size: 16px; margin: 0 0 10px; }
+h3 { font-size: 14px; margin: 10px 0 6px; display: flex; align-items: center; gap: 8px; }
+h3 i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.sub { margin: 0; color: var(--muted); font-size: 12px; }
+main { max-width: 900px; margin: 0 auto; padding: 12px; display: grid; gap: 12px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.wrap { flex-wrap: wrap; }
+label { display: block; font-size: 13px; color: var(--muted); }
+input, select, button { font: inherit; color: var(--text); background: #0c0e12; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
+input[type=search] { flex: 1; min-width: 0; }
+input[type=number] { width: 80px; display: block; margin-top: 4px; }
+.settings label { flex: 1; min-width: 140px; }
+.settings select, .settings input { width: 100%; margin-top: 4px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+.hint, .muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.pill { font-size: 12px; padding: 3px 10px; border-radius: 99px; background: #13301f; color: #8ee0b0; }
+.pill.off { background: #3a1416; color: #ffb3b5; }
+#map { height: 52vh; min-height: 320px; border-radius: 12px; border: 1px solid var(--line); }
+.candidates { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; }
+.candidates button { width: 100%; text-align: left; font-size: 13px; }
+details { margin-top: 12px; }
+summary { cursor: pointer; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+label.check { display: flex; gap: 8px; align-items: center; color: var(--text); }
+.overall { margin: 8px 0 12px; padding: 10px 12px; border-radius: 8px; font-size: 16px; }
+.lv-alto.overall { background: rgba(229,72,77,.15); border: 1px solid var(--alto); }
+.lv-moderado.overall { background: rgba(245,165,36,.12); border: 1px solid var(--moderado); }
+.lv-baixo.overall { background: rgba(48,164,108,.12); border: 1px solid var(--baixo); }
+.actions button { font-size: 13px; }
+.risks { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.risks li { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 8px; background: #12151b; }
+.tag { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 6px; flex: none; margin-top: 2px; }
+.lv-alto .tag { background: var(--alto); color: #fff; }
+.lv-moderado .tag { background: var(--moderado); color: #1a1205; }
+.lv-baixo .tag { background: var(--baixo); color: #04140c; }
+.lv-info .tag { background: var(--info); color: #fff; }
+.cat ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.cat li { display: flex; justify-content: space-between; gap: 10px; padding: 8px; background: #12151b; border-radius: 8px; flex-wrap: wrap; }
+.links { display: flex; gap: 10px; font-size: 13px; align-items: center; }
+.saved { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.saved li { display: flex; gap: 6px; }
+.saved .link { flex: 1; text-align: left; }
+.saved .del { width: 40px; }
+ol { padding-left: 20px; margin: 0; }
+ol li { margin: 4px 0; }
+@media print {
+  .top, #searchPanel, #map, #savedPanel, .actions, #statusPanel { display: none !important; }
+  html, body { background: #fff; color: #000; }
+  .panel { border: 1px solid #ccc; background: #fff; }
+  .risks li, .cat li { background: #fff; border: 1px solid #ddd; }
+  .muted { color: #444; }
+}
