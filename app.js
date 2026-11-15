@@ -94,7 +94,7 @@
   let dataIndex;
   async function loadIndex() {
     if (dataIndex !== undefined) return dataIndex;
-    try { dataIndex = await fetchJSON('data/index.json', {}, 15000); } catch { dataIndex = null; }
+    try { dataIndex = await fetchJSON('data/index.json', { cache: 'no-cache' }, 15000); } catch { dataIndex = null; }
     return dataIndex;
   }
   async function localItems(lat, lon, radius) {
@@ -102,7 +102,7 @@
     if (!idx) return null;
     const have = new Set(idx.tiles);
     const keys = SR.tilesFor(lat, lon, SR.MAX_RADIUS, idx.tile).filter((k) => have.has(k));
-    const parts = await Promise.all(keys.map((k) => fetchJSON(`data/t/${k}.json`, {}, 30000).catch(() => [])));
+    const parts = await Promise.all(keys.map((k) => fetchJSON(`data/t/${k}.json?b=${encodeURIComponent(idx.built)}`, {}, 30000).catch(() => [])));
     return { items: SR.fromTiles(parts.flat(), { lat, lon }, radius, idx.cats), built: idx.built };
   }
 

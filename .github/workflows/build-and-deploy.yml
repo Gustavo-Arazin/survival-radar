@@ -63,6 +63,10 @@ jobs:
           mkdir -p dist
           cp index.html styles.css app.js rules.js sw.js manifest.webmanifest icon.svg .nojekyll dist/
           node pipeline/build-tiles.js filtered.geojsonseq dist/data
+          V=${GITHUB_SHA::7}
+          sed -i -E "s#(src|href)=\"(styles\.css|app\.js|rules\.js)\"#\1=\"\2?v=$V\"#g" dist/index.html
+          sed -i "s#const SHELL = 'sr-shell-v1'#const SHELL = 'sr-shell-$V'#" dist/sw.js
+          grep -o '?v=[a-f0-9]*' dist/index.html | head -3
           du -sh dist/data
 
       - name: Publicar no GitHub Pages
