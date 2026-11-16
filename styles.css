@@ -201,3 +201,4 @@ label.inline input { width: 90px; flex: none; }
 td, .scn-name, li { overflow-wrap: break-word; }
 label.inline { display: inline-flex; width: auto; max-width: 100%; }
 .row > label.inline { flex: 0 0 auto; }
+#planForm label.inline > input { width: 90px; margin-top: 0; }
