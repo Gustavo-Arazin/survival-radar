@@ -22,3 +22,13 @@ const items = o2.shopping.filter(x=>x.cat.startsWith('Cenário')).map(x=>x.item)
 console.log(items);
 if (sc.title !== 'Cenários simulados' || !/90 dias/.test(o2.alerts[0].text) || new Set(items).size !== items.length) throw new Error('scenario');
 if (!sc.rows.some(r=>/Tsunami/.test(r[0]))) throw new Error('custom');
+const h3 = { horizon: 14, people: h.people, pets: [], money: { monthly: 6000 },
+  hasVehicle: true, vehicles: [{type:'suv',model:'SW4',year:'2022',fuel:'diesel',armored:'sim',drive:'4x4',tank:80,kmPerL:9},{type:'carro',model:'Leaf',fuel:'eletrico',armored:'nao',drive:'4x2',range:300}],
+  properties: [{name:'Apto',type:'apto',tenure:'alugado',use:'principal',housingCost:5000,condo:1200,bedrooms:3,lock:'comum'},{name:'Sítio',type:'sitio',tenure:'quitado',use:'secundaria',condo:150}] };
+const o3 = P.compute(h3, new Date(2026,10,16));
+for (const t of ['Veículos','Imóveis','Dinheiro']) { const s = o3.sections.find(x=>x.title===t); console.log('##', t, '—', s.lead); s.rows.slice(-4).forEach(r=>console.log('  ', r[0], '|', r[1])); }
+const veh = o3.sections.find(x=>x.title==='Veículos').rows.find(r=>r[0]==='Veículo de saída recomendado');
+if (!/SW4/.test(veh[1])) throw new Error('pick');
+// legacy migration path in engine
+const o4 = P.compute({ ...h, residence: { type:'casa', lock:'tetra' }, vehicle: { has:true, armored:true } }, new Date(2026,10,16));
+if (!o4.sections.find(x=>x.title==='Veículos')) throw new Error('legacy vehicle');

@@ -159,8 +159,33 @@
   ];
 
   // ---------- plano completo ----------
+  const RURAL = ['sitio', 'chacara', 'fazenda'];
+  const HOUSE = ['casa', 'sobrado', 'casa_cond', 'compartilhado', ...RURAL];
+  const PROP_TYPES = [['apto', 'Apartamento'], ['casa', 'Casa térrea'], ['sobrado', 'Sobrado'], ['casa_cond', 'Casa em condomínio'], ['compartilhado', 'Casa em terreno compartilhado (mais de uma família)'], ['sitio', 'Sítio'], ['chacara', 'Chácara'], ['fazenda', 'Fazenda']];
+  const TENURE = [['', '—'], ['quitado', 'Próprio, quitado'], ['financiado', 'Próprio, financiado'], ['alugado', 'Alugado (inquilino)'], ['cedido', 'Cedido ou emprestado']];
+  const USE = [['principal', 'Residência principal'], ['secundaria', 'Segunda residência ou refúgio'], ['outro', 'Outro uso']];
+  const VEH_TYPES = [['carro', 'Carro de passeio'], ['suv', 'SUV'], ['picape', 'Picape'], ['van', 'Van ou utilitário'], ['moto', 'Moto'], ['caminhao', 'Caminhão'], ['outro', 'Outro']];
+  const FUELS = [['flex', 'Flex (gasolina/etanol)'], ['gasolina', 'Gasolina'], ['etanol', 'Etanol'], ['diesel', 'Diesel'], ['gnv', 'GNV'], ['hibrido', 'Híbrido'], ['eletrico', 'Elétrico']];
+  const DRIVE = [['4x2', '4x2 (tração simples)'], ['4x4', '4x4 / AWD (tração integral)']];
+  const label = (list, v) => (list.find((x) => x[0] === v) || [0, ''])[1];
+  const isArmored = (v) => v.armored === true || v.armored === 'sim';
+
+  function properties(h) {
+    if (Array.isArray(h.properties) && h.properties.length) return h.properties;
+    if (h.residence) return [{ name: 'Residência principal', use: 'principal', ...h.residence }];
+    return [];
+  }
+  function vehicles(h) {
+    if (Array.isArray(h.vehicles)) return h.hasVehicle === false ? [] : h.vehicles;
+    if (h.vehicle && h.vehicle.has) return [{ type: 'carro', fuel: 'flex', armored: h.vehicle.armored, tank: h.vehicle.tank, kmPerL: h.vehicle.kmPerL }];
+    return [];
+  }
+
   function compute(h, today) {
     const days = Math.max(3, +h.horizon || 14);
+    const props = properties(h);
+    const res = props.find((p) => (p.use || 'principal') === 'principal') || props[0] || {};
+    const vehs = vehicles(h);
     const people = (h.people || []).map((p) => ({ ...p, mo: ageMonths(p.birth, today) }));
     const adults = people.filter((p) => ['adulto', 'idoso', 'adolescente'].includes(stage(p.mo)));
     const out = { days, sections: [], shopping: [], alerts: [], people };
@@ -173,7 +198,7 @@
     for (const pet of h.pets || []) petWater += petWaterDay(pet);
     const potTotal = ceil((pot + petWater) * days);
     const hygTotal = ceil(hyg * days);
-    const tank = +((h.residence || {}).waterTank) || 0;
+    const tank = +res.waterTank || 0;
     buy('Água', 'Água potável em galões de 20 L', `${ceil(potTotal / 20)} galões (${potTotal} L)`, 'Distribuidora de água (entrega) ou supermercado', 'Gire o estoque: use um galão por vez e reponha.');
     buy('Água', 'Hipoclorito de sódio 2,5% (água sanitária sem perfume para tratar água)', '1 frasco de 1 L', 'Supermercado ou farmácia', '2 gotas por litro, 30 min antes de beber.');
     buy('Água', 'Filtro de barro ou cerâmico por gravidade', '1', 'Loja de utilidades domésticas', 'Funciona sem energia.');
@@ -197,7 +222,7 @@
       buy('Comida', f.item, qty, f.where, f.note);
     }
     buy('Comida', 'Sal, temperos, café ou chá', 'consumo normal do período', 'Supermercado', '');
-    const gas = (h.residence || {}).gas;
+    const gas = res.gas;
     if (gas === 'botijao') buy('Comida', 'Botijão de gás reserva (P13)', '1 cheio', 'Revendedora de gás', 'Guarde em área ventilada, nunca em ambiente fechado.');
     else buy('Comida', 'Fogareiro portátil a cartucho + cartuchos de gás', `1 fogareiro + ${ceil(days / 2)} cartuchos`, 'Loja de camping ou de utilidades', 'Use só em área ventilada (risco de monóxido de carbono).');
     out.sections.push({
@@ -276,15 +301,20 @@
     if (people.some((p) => !p.blood)) out.alerts.push({ level: 'moderado', text: 'Tipo sanguíneo não informado para todos: confira na carteira de doador, no exame de pré-natal ou no teste do pezinho.' });
 
     // Dinheiro
-    const c = cash((h.money || {}).monthly, days);
-    out.sections.push({
-      title: 'Dinheiro em espécie', lead: `R$ ${c.target.toLocaleString('pt-BR')} para ${days} dias de despesas essenciais, em notas pequenas.`,
-      rows: c.notes.map((n) => [`Notas de R$ ${n.note}`, `${n.count} notas (R$ ${(n.count * n.note).toLocaleString('pt-BR')})`]).concat([['Evite', 'notas de R$ 100 e R$ 200: em crise, ninguém tem troco']]),
-    });
+    const essentials = +((h.money || {}).monthly) || 0;
+    const housing = props.reduce((sum, p) => sum + (['alugado', 'financiado'].includes(p.tenure) ? +p.housingCost || 0 : 0) + (+p.condo || 0), 0);
+    const c = cash(essentials, days);
+    const brl = (v) => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+    const moneyRows = c.notes.map((n) => [`Notas de R$ ${n.note}`, `${n.count} notas (R$ ${(n.count * n.note).toLocaleString('pt-BR')})`]).concat([['Evite', 'notas de R$ 100 e R$ 200: em crise, ninguém tem troco']]);
+    if (essentials || housing) {
+      moneyRows.push(['Custo mensal da família', `${brl(essentials + housing)} (essenciais ${brl(essentials)} + moradia ${brl(housing)})`]);
+      moneyRows.push(['Reserva financeira (em banco, liquidez diária)', `${brl((essentials + housing) * 6)} a ${brl((essentials + housing) * 12)}: 6 meses com renda fixa, 12 meses com renda variável`]);
+    }
+    if (props.some((p) => p.tenure === 'alugado')) moneyRows.push(['Aluguel', 'o aluguel continua vencendo na crise: inclua-o na reserva, não no dinheiro em espécie']);
+    out.sections.push({ title: 'Dinheiro', lead: `${brl(c.target)} em espécie para ${days} dias de despesas essenciais, em notas pequenas.`, rows: moneyRows });
     buy('Dinheiro', 'Dinheiro em espécie, notas pequenas', `R$ ${c.total.toLocaleString('pt-BR')}`, 'Caixa eletrônico ou agência', 'Guarde em dois lugares diferentes da casa.');
 
     // Iluminação e energia
-    const res = h.residence || {};
     const beds = Math.max(1, +res.bedrooms || 2);
     const nAd = Math.max(1, adults.length);
     const stairs = res.type === 'sobrado' || res.type === 'casa_cond' ? 1 : 0;
@@ -310,27 +340,47 @@
     buy('Energia', 'Estação de energia portátil', res.solar ? '1–2 kWh + painel 400 W' : '≥ 2 kWh', 'Loja de eletrônicos', 'Mantenha carregada a 80% e teste a cada 3 meses.');
     buy('Energia', 'Rádio AM/FM a pilha ou manivela', '1', 'Loja de eletrônicos', 'Informação quando internet e celular caem.');
 
-    // Veículo
-    const v = h.vehicle || {};
-    if (v.has) {
-      const range = (+v.tank || 0) * (+v.kmPerL || 0);
-      const vr = [
-        ['Autonomia com tanque cheio', range ? `${Math.round(range)} km` : 'informe tanque e consumo'],
-        ['Regra', 'tanque sempre acima da metade'],
-        ['Combustível estocado em casa', 'não: risco de incêndio e proibido em condomínio'],
-      ];
-      if (v.armored) {
-        vr.push(['Blindagem: ponto forte', 'protege em distúrbio civil e criminalidade; é o meio de saída preferencial']);
+    // Veículos
+    if (vehs.length) {
+      const vr = [];
+      vehs.forEach((v, i) => {
+        const name = [label(VEH_TYPES, v.type) || 'Veículo', v.model, v.year].filter(Boolean).join(' · ');
+        const ev = v.fuel === 'eletrico';
+        const range = ev ? +v.range || 0 : (+v.tank || 0) * (+v.kmPerL || 0);
+        vr.push([`${i + 1}. ${name}`, [label(FUELS, v.fuel), isArmored(v) ? 'blindado' : '', v.drive === '4x4' ? '4x4' : '', range ? `autonomia ${Math.round(range)} km` : (ev ? 'informe a autonomia' : 'informe tanque e consumo')].filter(Boolean).join(' · ')]);
+        if (v.notes) vr.push(['', 'Obs.: ' + v.notes]);
+      });
+      vr.push(['Regra', 'tanque sempre acima da metade; elétrico sempre acima de 60%']);
+      vr.push(['Combustível estocado em casa', 'não: risco de incêndio e proibido em condomínio']);
+      if (vehs.some((v) => v.fuel === 'eletrico')) vr.push(['Elétrico', 'em apagão não há recarga: conta só o que está na bateria. Não planeje a saída principal com ele']);
+      if (vehs.some((v) => v.fuel === 'hibrido')) vr.push(['Híbrido', 'roda só com combustível; bom veículo de saída em apagão']);
+      if (vehs.some((v) => v.fuel === 'gnv')) vr.push(['GNV', 'poucos postos; em desabastecimento, rode na gasolina']);
+      if (vehs.some(isArmored)) {
+        vr.push(['Blindagem: ponto forte', 'protege em distúrbio civil e criminalidade']);
         vr.push(['Blindagem: ponto cego', 'vidro blindado não quebra por dentro. Nunca entre em via alagada: em submersão não há rota de fuga pela janela']);
         vr.push(['Blindagem: manutenção', 'confira pneus run-flat, borrachas e fechaduras na revisão; o peso aumenta consumo e frenagem']);
       }
-      out.sections.push({ title: 'Veículo', lead: v.armored ? 'Carro blindado: ótimo contra violência, inútil contra água.' : 'O carro é o plano de saída.', rows: vr });
-      buy('Veículo', 'Kit no porta-malas: água, manta, carregador, lanterna, kit de primeiros socorros', '1', 'Supermercado e farmácia', '');
+      if (vehs.some((v) => v.drive === '4x4')) vr.push(['4x4', 'vale em terra, lama e serra (acesso a sítio ou chácara); não torna seguro atravessar alagamento']);
+      const pick = vehs.find(isArmored) || vehs.find((v) => v.drive === '4x4' && v.fuel !== 'eletrico') || vehs.find((v) => v.fuel !== 'eletrico') || vehs[0];
+      const pickName = [label(VEH_TYPES, pick.type), pick.model].filter(Boolean).join(' ');
+      vr.push(['Veículo de saída recomendado', `${pickName}${isArmored(pick) ? ' (blindado)' : ''}${props.some((p) => RURAL.includes(p.type)) && pick.drive !== '4x4' && vehs.some((v) => v.drive === '4x4') ? '; para ir ao imóvel rural, prefira o 4x4' : ''}`]);
+      out.sections.push({ title: 'Veículos', lead: `${vehs.length} veículo(s). ${vehs.some(isArmored) ? 'Blindado: ótimo contra violência, inútil contra água.' : 'O veículo é o plano de saída.'}`, rows: vr });
+      buy('Veículos', 'Kit no porta-malas: água, manta, carregador, lanterna, primeiros socorros', `${vehs.length}`, 'Supermercado e farmácia', 'Um por veículo.');
+    }
+
+    // Imóveis
+    if (props.length) {
+      const pr = props.map((p, i) => [`${i + 1}. ${p.name || label(PROP_TYPES, p.type) || 'Imóvel'}`, [label(PROP_TYPES, p.type), label(TENURE, p.tenure), label(USE, p.use || 'principal')].filter(Boolean).join(' · ')]);
+      if (props.some((p) => p.type === 'compartilhado')) pr.push(['Terreno compartilhado', 'combine com as outras famílias: portão, chaves, quem abre para estranhos e o ponto de encontro comum']);
+      if (props.some((p) => RURAL.includes(p.type))) pr.push(['Imóvel rural', 'polícia e socorro demoram mais: comunicação com vizinhos, iluminação externa e primeiros socorros reforçados']);
+      const refuge = props.filter((p) => p !== res && (p.use === 'secundaria' || RURAL.includes(p.type)));
+      if (refuge.length) pr.push(['Destino de saída', `${refuge.map((p) => p.name || label(PROP_TYPES, p.type)).join(', ')}: mantenha lá estoque de 72 h, chave reserva com a família e a rota testada`]);
+      out.sections.push({ title: 'Imóveis', lead: `${props.length} imóvel(is). O plano de estoque e segurança considera a residência principal.`, rows: pr });
     }
 
     // Segurança da residência
     const sec = [];
-    const isHouse = ['casa', 'sobrado', 'casa_cond'].includes(res.type);
+    const isHouse = HOUSE.includes(res.type);
     if (res.lock === 'comum' || !res.lock) sec.push(['Fechadura da porta principal', 'PRIORIDADE: trocar por fechadura de alta segurança (cilindro anti-arrombamento e anti-mixa) + uma trava auxiliar + chapa de reforço no batente. A chave "tetra" sozinha não é o que dá segurança: o que conta é cilindro certificado e batente reforçado']);
     else if (res.lock === 'tetra') sec.push(['Fechadura da porta principal', 'aceitável; o ganho seguinte é cilindro certificado anti-arrombamento + trava auxiliar + chapa no batente']);
     else if (res.lock === 'digital') sec.push(['Fechadura da porta principal', 'confira se tem chave mecânica de emergência e bateria reserva; sem energia, ela precisa abrir']);
@@ -389,7 +439,7 @@
     return out;
   }
 
-  const api = { SCENARIOS, PET_SPECIES, compute, ageMonths, stage, fmtAge, waterPerDay, kcalPerDay, diapersPerDay, diaperSize, petFood, cash, FOOD };
+  const api = { PROP_TYPES, TENURE, USE, VEH_TYPES, FUELS, DRIVE, SCENARIOS, PET_SPECIES, compute, ageMonths, stage, fmtAge, waterPerDay, kcalPerDay, diapersPerDay, diaperSize, petFood, cash, FOOD };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PLAN = api;
 })(typeof self !== 'undefined' ? self : this);

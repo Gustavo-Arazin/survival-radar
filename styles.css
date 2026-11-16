@@ -167,3 +167,15 @@ ol li { margin: 6px 0; }
 }
 .leaflet-top, .leaflet-bottom { z-index: 700; }
 @media (max-width: 860px) { .sub { display: none; } }
+
+/* ---------- cenários em cartões (nome + dias conectados) ---------- */
+.scn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-top: 4px; }
+.scn { display: grid; grid-template-columns: 18px 1fr 92px; align-items: center; column-gap: 12px; min-height: 64px; padding-left: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--brand-near-black); cursor: pointer; overflow: hidden; transition: border-color 200ms var(--ease-brand); }
+.scn:hover { border-color: var(--brand-structural-gray); }
+.scn-name { font-size: 13.5px; line-height: 1.35; color: var(--text); padding: 10px 0; }
+.scn-days { align-self: stretch; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--line); background: var(--brand-carbon); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap; color: var(--muted); transition: color 200ms var(--ease-brand), background 200ms var(--ease-brand); }
+.scn.on { border-color: var(--accent); }
+.scn.on .scn-days { color: var(--accent); border-left-color: var(--accent); background: rgba(99,176,253,.08); }
+label.inline { display: flex; gap: 10px; align-items: center; color: var(--text); font-size: 13.5px; font-weight: 400; }
+label.inline input { width: 80px; }
+.planimg { max-width: 100%; margin-top: 12px; border-radius: var(--radius); border: 1px solid var(--line); }

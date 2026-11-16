@@ -12,11 +12,27 @@
     scenarios: ['apagao', 'chuva', 'invasao'], scenarioOther: '',
     people: [{ name: 'Adulto 1', sex: '', birth: '' }, { name: 'Adulto 2', sex: '', birth: '' }],
     pets: [],
-    vehicle: { has: false, armored: false, tank: '', kmPerL: '' },
-    residence: { type: 'apto', floor: '', area: '', bedrooms: 2, waterTank: '', gas: 'encanado', elevator: false, concierge: false, lock: 'comum', door: 'macica', solar: false, utilities: { gas: '', water: '', power: '' }, exit1: '', exit2: '', meet: '', refuge: '' },
+    hasVehicle: false, vehicles: [],
+    properties: [newProperty('Residência principal')],
     money: { monthly: '' },
   };
-  const load = () => { try { return Object.assign(structuredClone(DEFAULT), JSON.parse(localStorage.getItem(KEY)) || {}); } catch { return structuredClone(DEFAULT); } };
+  function newProperty(name) {
+    return { name: name || '', type: 'apto', tenure: '', use: 'principal', housingCost: '', condo: '', families: '', floor: '', area: '', bedrooms: 2, waterTank: '', gas: 'encanado', elevator: false, concierge: false, lock: 'comum', door: 'macica', solar: false, utilities: { gas: '', water: '', power: '' }, exit1: '', exit2: '', meet: '', refuge: '' };
+  }
+  const newVehicle = () => ({ type: 'carro', model: '', year: '', fuel: 'flex', armored: 'nao', drive: '4x2', tank: '', kmPerL: '', range: '', notes: '' });
+  // Converte dados do formato anterior (um imóvel e um veículo) para listas.
+  function migrateRaw(raw) {
+    if (!raw) return raw;
+    if (raw.residence && !raw.properties) { raw.properties = [{ ...newProperty('Residência principal'), ...raw.residence }]; }
+    delete raw.residence;
+    if (raw.vehicle && !raw.vehicles) {
+      raw.hasVehicle = !!raw.vehicle.has;
+      raw.vehicles = raw.vehicle.has ? [{ ...newVehicle(), armored: raw.vehicle.armored ? 'sim' : 'nao', tank: raw.vehicle.tank || '', kmPerL: raw.vehicle.kmPerL || '' }] : [];
+    }
+    delete raw.vehicle;
+    return raw;
+  }
+  const load = () => { try { return Object.assign(structuredClone(DEFAULT), migrateRaw(JSON.parse(localStorage.getItem(KEY))) || {}); } catch { return structuredClone(DEFAULT); } };
   let H = load();
   (function migrate() {
     if (Array.isArray(H.meds) && H.meds.length) {
@@ -41,7 +57,7 @@
       kids: ps.filter((p) => st(p) === 'crianca').length,
       elderly: ps.filter((p) => st(p) === 'idoso').length,
       mobility: ps.some((p) => p.mobility), meds: ps.some((p) => p.usesMeds && (p.meds || []).some((m) => m.name)),
-      car: !!H.vehicle.has, pets: H.pets.length > 0, armored: !!H.vehicle.armored,
+      car: !!H.hasVehicle && H.vehicles.length > 0, pets: H.pets.length > 0, armored: H.hasVehicle && H.vehicles.some((v) => v.armored === 'sim'),
     };
   };
 
@@ -102,8 +118,60 @@
     </div>`;
   }
 
+  function vehicleCard(v, i) {
+    const b = `vehicles.${i}`, ev = v.fuel === 'eletrico';
+    return `<div class="card"><div class="cardhead"><b>Veículo ${i + 1}</b><span class="muted small">${esc([v.model, v.year].filter(Boolean).join(' · '))}</span></div>
+      <div class="grid3">
+        ${lab('Tipo', sel(`${b}.type`, v.type, PLAN.VEH_TYPES))}
+        ${lab('Marca e modelo', inp(`${b}.model`, v.model, 'maxlength="40" placeholder="Ex.: Toyota SW4"'))}
+        ${lab('Ano', inp(`${b}.year`, v.year, 'type="number" min="1950" max="2030"'))}
+        ${lab('Combustível', sel(`${b}.fuel`, v.fuel, PLAN.FUELS))}
+        ${lab('Blindado', sel(`${b}.armored`, v.armored, [['nao', 'Não'], ['sim', 'Sim']]))}
+        ${lab('Tração', sel(`${b}.drive`, v.drive, PLAN.DRIVE))}
+        ${ev ? lab('Autonomia com bateria cheia (km)', inp(`${b}.range`, v.range, 'type="number" min="0"')) : lab('Tanque (L)', inp(`${b}.tank`, v.tank, 'type="number" min="0"')) + lab('Consumo (km/L)', inp(`${b}.kmPerL`, v.kmPerL, 'type="number" min="0" step="0.1"'))}
+      </div>
+      ${lab('Observação', inp(`${b}.notes`, v.notes, 'maxlength="160" placeholder="Algo específico deste veículo"'))}
+    </div>`;
+  }
+
+  function propertyCard(r, i) {
+    const b = `properties.${i}`, u = r.utilities || (r.utilities = {});
+    const paysHousing = ['alugado', 'financiado'].includes(r.tenure);
+    return `<div class="card"><div class="cardhead"><b>${esc(r.name || 'Imóvel ' + (i + 1))}</b><span class="muted small">${esc((PLAN.USE.find((x) => x[0] === (r.use || 'principal')) || [0, ''])[1])}</span></div>
+      <div class="grid3">
+        ${lab('Nome', inp(`${b}.name`, r.name, 'maxlength="30" placeholder="Ex.: Casa, Sítio"'))}
+        ${lab('Tipo', sel(`${b}.type`, r.type, PLAN.PROP_TYPES))}
+        ${lab('Ocupação', sel(`${b}.tenure`, r.tenure || '', PLAN.TENURE))}
+        ${lab('Uso', sel(`${b}.use`, r.use || 'principal', PLAN.USE))}
+        ${paysHousing ? lab(r.tenure === 'alugado' ? 'Aluguel mensal (R$)' : 'Parcela mensal do financiamento (R$)', inp(`${b}.housingCost`, r.housingCost, 'type="number" min="0" step="50"')) : ''}
+        ${lab('Condomínio + IPTU por mês (R$)', inp(`${b}.condo`, r.condo, 'type="number" min="0" step="50"'))}
+        ${r.type === 'compartilhado' ? lab('Famílias no mesmo terreno', inp(`${b}.families`, r.families, 'type="number" min="2" max="20"')) : ''}
+        ${r.type === 'apto' ? lab('Andar', inp(`${b}.floor`, r.floor, 'type="number" min="0"')) : ''}
+        ${lab('Área (m²)', inp(`${b}.area`, r.area, 'type="number" min="0"'))}
+        ${lab('Quartos', inp(`${b}.bedrooms`, r.bedrooms, 'type="number" min="1"'))}
+        ${lab('Caixa d\'água própria (L)', inp(`${b}.waterTank`, r.waterTank, 'type="number" min="0"'))}
+        ${lab('Gás', sel(`${b}.gas`, r.gas, [['encanado', 'Encanado'], ['botijao', 'Botijão']]))}
+        ${lab('Fechadura da porta principal', sel(`${b}.lock`, r.lock, [['comum', 'Comum'], ['tetra', 'Chave tetra'], ['alta', 'Alta segurança / multiponto'], ['digital', 'Digital']]))}
+        ${lab('Porta principal', sel(`${b}.door`, r.door, [['madeira_oca', 'Madeira oca'], ['macica', 'Madeira maciça'], ['aco', 'Aço'], ['blindada', 'Blindada']]))}
+      </div>
+      <div class="row wrap">${r.type === 'apto' ? chk(`${b}.elevator`, r.elevator, 'Elevador') : ''}${chk(`${b}.concierge`, r.concierge, 'Portaria ou vigilância 24 h')}${chk(`${b}.solar`, r.solar, 'Espaço com sol para painel solar')}</div>
+      <h3>Onde fica (escreva de um jeito que qualquer um da família encontre)</h3>
+      <div class="grid3">
+        ${lab('Registro de gás', inp(`${b}.utilities.gas`, u.gas))}
+        ${lab('Registro de água', inp(`${b}.utilities.water`, u.water))}
+        ${lab('Quadro de energia', inp(`${b}.utilities.power`, u.power))}
+        ${lab('Rota de saída principal', inp(`${b}.exit1`, r.exit1))}
+        ${lab('Rota de saída alternativa', inp(`${b}.exit2`, r.exit2))}
+        ${lab('Ponto de encontro fora de casa', inp(`${b}.meet`, r.meet))}
+        ${lab('Cômodo de refúgio', inp(`${b}.refuge`, r.refuge))}
+      </div>
+      <h3>Planta</h3>
+      <input type="file" data-plan="${i}" accept="image/*">
+      <img data-planimg="${i}" class="planimg" alt="Planta do imóvel" hidden>
+    </div>`;
+  }
+
   function renderForm() {
-    const r = H.residence, v = H.vehicle, u = r.utilities || (r.utilities = {});
     $('planForm').innerHTML = `
       <div class="panel"><h2>Horizonte do estoque</h2>
         <div class="grid3">
@@ -113,44 +181,26 @@
       </div>
       <div class="panel"><h2>Cenários a simular</h2>
         <p class="muted small">Marque todos que se aplicam. O plano junta os itens de todos, sem repetir.</p>
-        <div class="grid2">${PLAN.SCENARIOS.map((x) => `<label class="check"><input type="checkbox" data-scn="${x.id}" ${(H.scenarios || []).includes(x.id) ? 'checked' : ''}> ${esc(x.label)}${x.horizon ? ` <span class="muted small">· ${x.horizon} dias</span>` : ''}</label>`).join('')}
-          <label class="check"><input type="checkbox" data-scn="outro" ${(H.scenarios || []).includes('outro') ? 'checked' : ''}> Outro</label>
+        <div class="scn-grid">${PLAN.SCENARIOS.concat([{ id: 'outro', label: 'Outro', horizon: null }]).map((x) => {
+          const on = (H.scenarios || []).includes(x.id);
+          const days = x.horizon == null ? '—' : x.horizon === 0 ? 'Imediato' : `${x.horizon}&nbsp;dias`;
+          return `<label class="scn${on ? ' on' : ''}"><input type="checkbox" data-scn="${x.id}" ${on ? 'checked' : ''}><span class="scn-name">${esc(x.label)}</span><span class="scn-days">${days}</span></label>`;
+        }).join('')}
         </div>
         ${(H.scenarios || []).includes('outro') ? lab('Qual cenário?', inp('scenarioOther', H.scenarioOther, 'maxlength="120" placeholder="Descreva a situação"')) : ''}
       </div>
       <div class="panel"><h2>Pessoas</h2>${H.people.map(personCard).join('')}
         <button type="button" data-add="people">+ Pessoa</button></div>
       <div class="panel"><h2>Animais</h2>${H.pets.map(petCard).join('')}<button type="button" data-add="pets">+ Animal</button></div>
-      <div class="panel"><h2>Veículo</h2>
-        <div class="row wrap">${chk('vehicle.has', v.has, 'Família tem carro')}${chk('vehicle.armored', v.armored, 'Blindado')}</div>
-        <div class="grid3">${lab('Tanque (L)', inp('vehicle.tank', v.tank, 'type="number" min="0"'))}${lab('Consumo (km/L)', inp('vehicle.kmPerL', v.kmPerL, 'type="number" min="0" step="0.1"'))}</div>
+      <div class="panel"><h2>Veículos</h2>
+        <div class="row wrap">${chk('hasVehicle', H.hasVehicle, 'Possui veículo')}
+          ${H.hasVehicle ? `<label class="inline">Quantos? <input type="number" min="1" max="10" data-count="vehicles" value="${H.vehicles.length || 1}"></label>` : ''}</div>
+        ${H.hasVehicle ? H.vehicles.map(vehicleCard).join('') : ''}
       </div>
-      <div class="panel"><h2>Residência</h2>
-        <div class="grid3">
-          ${lab('Tipo', sel('residence.type', r.type, [['apto', 'Apartamento'], ['casa', 'Casa térrea'], ['sobrado', 'Sobrado'], ['casa_cond', 'Casa em condomínio']]))}
-          ${lab('Andar', inp('residence.floor', r.floor, 'type="number" min="0"'))}
-          ${lab('Área (m²)', inp('residence.area', r.area, 'type="number" min="0"'))}
-          ${lab('Quartos', inp('residence.bedrooms', r.bedrooms, 'type="number" min="1"'))}
-          ${lab('Caixa d\'água própria (L)', inp('residence.waterTank', r.waterTank, 'type="number" min="0"'))}
-          ${lab('Gás', sel('residence.gas', r.gas, [['encanado', 'Encanado'], ['botijao', 'Botijão']]))}
-          ${lab('Fechadura da porta principal', sel('residence.lock', r.lock, [['comum', 'Comum'], ['tetra', 'Chave tetra'], ['alta', 'Alta segurança / multiponto'], ['digital', 'Digital']]))}
-          ${lab('Porta principal', sel('residence.door', r.door, [['madeira_oca', 'Madeira oca'], ['macica', 'Madeira maciça'], ['aco', 'Aço'], ['blindada', 'Blindada']]))}
-        </div>
-        <div class="row wrap">${chk('residence.elevator', r.elevator, 'Elevador')}${chk('residence.concierge', r.concierge, 'Portaria 24 h')}${chk('residence.solar', r.solar, 'Varanda ou laje com sol (painel solar)')}</div>
-        <h3>Onde fica (escreva de um jeito que qualquer um da família encontre)</h3>
-        <div class="grid3">
-          ${lab('Registro de gás', inp('residence.utilities.gas', u.gas))}
-          ${lab('Registro de água', inp('residence.utilities.water', u.water))}
-          ${lab('Quadro de energia', inp('residence.utilities.power', u.power))}
-          ${lab('Rota de saída principal', inp('residence.exit1', r.exit1))}
-          ${lab('Rota de saída alternativa', inp('residence.exit2', r.exit2))}
-          ${lab('Ponto de encontro fora de casa', inp('residence.meet', r.meet))}
-          ${lab('Cômodo de refúgio', inp('residence.refuge', r.refuge))}
-        </div>
-        <h3>Planta da casa</h3>
-        <input type="file" id="planFile" accept="image/*">
-        <img id="planImg" alt="Planta da residência" hidden>
-        <p class="muted small">A imagem fica só neste aparelho. Marque nela, antes de enviar, as saídas e os registros.</p>
+      <div class="panel"><h2>Imóveis</h2>
+        <div class="row wrap"><label class="inline">Quantidade de imóveis <input type="number" min="1" max="10" data-count="properties" value="${H.properties.length || 1}"></label></div>
+        ${H.properties.map(propertyCard).join('')}
+        <p class="muted small">A planta fica só neste aparelho. O estoque e a segurança são calculados para a residência principal.</p>
       </div>
       <div class="panel"><h2>Dinheiro</h2>
         ${lab('Gasto mensal essencial da família (mercado, farmácia, transporte), em R$', inp('money.monthly', H.money.monthly, 'type="number" min="0" step="100"'))}
@@ -192,11 +242,22 @@
     if (scn) {
       const set = new Set(H.scenarios || []);
       e.target.checked ? set.add(scn) : set.delete(scn);
-      H.scenarios = [...set]; save(); if (scn === 'outro') rerender(); else renderOutput();
+      H.scenarios = [...set]; save();
+      e.target.closest('.scn').classList.toggle('on', e.target.checked);
+      if (scn === 'outro') rerender(); else renderOutput();
       return;
     }
+    const cnt = e.target.dataset.count;
+    if (cnt) {
+      const n = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1));
+      const arr = H[cnt];
+      while (arr.length < n) arr.push(cnt === 'vehicles' ? newVehicle() : newProperty(arr.length ? '' : 'Residência principal'));
+      if (arr.length > n) arr.length = n;
+      save(); rerender(); return;
+    }
     const p = e.target.dataset.p || '';
-    if (/(controlled|species|usesMeds)$/.test(p)) rerender();
+    if (p === 'hasVehicle' && H.hasVehicle && !H.vehicles.length) H.vehicles.push(newVehicle());
+    if (/(controlled|species|usesMeds|hasVehicle|\.type|\.tenure|\.fuel|\.use)$/.test(p)) { save(); rerender(); }
   });
   function rerender() { const y = scrollY; const a = document.activeElement && document.activeElement.dataset.p; renderForm(); renderOutput(); scrollTo(0, y); if (a) { const el = document.querySelector(`[data-p="${a}"]`); if (el && el.type !== 'date') el.focus(); } }
   $('planForm').addEventListener('click', (e) => {
@@ -218,16 +279,21 @@
     });
   }
   async function loadPlanImage() {
-    try {
-      const db = await idb();
-      const blob = await new Promise((res) => { const g = db.transaction('files').objectStore('files').get('planta'); g.onsuccess = () => res(g.result); g.onerror = () => res(null); });
-      if (blob) { $('planImg').src = URL.createObjectURL(blob); $('planImg').hidden = false; }
-    } catch {}
-    $('planFile').onchange = async (e) => {
-      const f = e.target.files[0]; if (!f) return;
-      try { const db = await idb(); db.transaction('files', 'readwrite').objectStore('files').put(f, 'planta'); } catch {}
-      $('planImg').src = URL.createObjectURL(f); $('planImg').hidden = false;
-    };
+    let db = null;
+    try { db = await idb(); } catch {}
+    document.querySelectorAll('[data-plan]').forEach(async (input) => {
+      const i = input.dataset.plan, key = i === '0' ? 'planta' : `planta-${i}`;
+      const img = document.querySelector(`[data-planimg="${i}"]`);
+      if (db) {
+        const blob = await new Promise((res) => { const g = db.transaction('files').objectStore('files').get(key); g.onsuccess = () => res(g.result); g.onerror = () => res(null); });
+        if (blob) { img.src = URL.createObjectURL(blob); img.hidden = false; }
+      }
+      input.onchange = (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        try { db && db.transaction('files', 'readwrite').objectStore('files').put(f, key); } catch {}
+        img.src = URL.createObjectURL(f); img.hidden = false;
+      };
+    });
   }
 
   // ---------- resultado ----------
@@ -275,7 +341,7 @@
   };
   $('planImport').onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    try { const j = JSON.parse(await f.text()); H = Object.assign(structuredClone(DEFAULT), j.house || {}); bought = j.bought || {}; save(); try { localStorage.setItem(BOUGHT, JSON.stringify(bought)); } catch {} renderForm(); renderOutput(); msg('Backup restaurado.'); }
+    try { const j = JSON.parse(await f.text()); H = Object.assign(structuredClone(DEFAULT), migrateRaw(j.house) || {}); bought = j.bought || {}; save(); try { localStorage.setItem(BOUGHT, JSON.stringify(bought)); } catch {} renderForm(); renderOutput(); msg('Backup restaurado.'); }
     catch { msg('Arquivo inválido.'); }
   };
 
