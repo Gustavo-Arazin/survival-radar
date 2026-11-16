@@ -179,3 +179,21 @@ ol li { margin: 6px 0; }
 label.inline { display: flex; gap: 10px; align-items: center; color: var(--text); font-size: 13.5px; font-weight: 400; }
 label.inline input { width: 80px; }
 .planimg { max-width: 100%; margin-top: 12px; border-radius: var(--radius); border: 1px solid var(--line); }
+
+/* ---------- tipografia: sem viúvas, títulos equilibrados ---------- */
+p, li, td, label, .scn-name, .hint, .muted, .small, .overall { text-wrap: pretty; }
+h1, h2, h3, .formtitle { text-wrap: balance; }
+label.inline { white-space: nowrap; flex-wrap: nowrap; }
+label.inline input { width: 90px; flex: none; }
+
+/* ---------- alinhamento ---------- */
+.grid3 { align-items: end; }
+.grid3 > label { display: flex; flex-direction: column; justify-content: flex-end; }
+.row.wrap { column-gap: 22px; row-gap: 10px; }
+.actions { gap: 8px !important; }
+.actions button, .actions .filebtn { min-height: 40px; display: inline-flex; align-items: center; }
+.cardhead { flex-wrap: wrap; row-gap: 4px; }
+.cat li > div:first-child { flex: 1 1 260px; min-width: 0; }
+.links { flex: 0 0 auto; }
+.tbl td:first-child { width: 36%; }
+.risks li > div { min-width: 0; }

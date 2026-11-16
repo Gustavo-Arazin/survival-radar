@@ -6,6 +6,7 @@
   const KEY = 'sr_house_v1';
   const BOUGHT = 'sr_bought_v1';
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const nw = (s) => String(s == null ? '' : s).replace(/ ([^ ]{1,14})$/, '\u00a0$1');
 
   const DEFAULT = {
     horizon: 14,
@@ -137,7 +138,7 @@
   function propertyCard(r, i) {
     const b = `properties.${i}`, u = r.utilities || (r.utilities = {});
     const paysHousing = ['alugado', 'financiado'].includes(r.tenure);
-    return `<div class="card"><div class="cardhead"><b>${esc(r.name || 'Imóvel ' + (i + 1))}</b><span class="muted small">${esc((PLAN.USE.find((x) => x[0] === (r.use || 'principal')) || [0, ''])[1])}</span></div>
+    return `<div class="card"><div class="cardhead"><b>${esc(r.name || 'Imóvel ' + (i + 1))}</b>${(() => { const u = (PLAN.USE.find((x) => x[0] === (r.use || 'principal')) || [0, ''])[1]; return u && u !== r.name ? `<span class="muted small">${esc(u)}</span>` : ''; })()}</div>
       <div class="grid3">
         ${lab('Nome', inp(`${b}.name`, r.name, 'maxlength="30" placeholder="Ex.: Casa, Sítio"'))}
         ${lab('Tipo', sel(`${b}.type`, r.type, PLAN.PROP_TYPES))}
@@ -184,7 +185,7 @@
         <div class="scn-grid">${PLAN.SCENARIOS.concat([{ id: 'outro', label: 'Outro', horizon: null }]).map((x) => {
           const on = (H.scenarios || []).includes(x.id);
           const days = x.horizon == null ? '—' : x.horizon === 0 ? 'Imediato' : `${x.horizon}&nbsp;dias`;
-          return `<label class="scn${on ? ' on' : ''}"><input type="checkbox" data-scn="${x.id}" ${on ? 'checked' : ''}><span class="scn-name">${esc(x.label)}</span><span class="scn-days">${days}</span></label>`;
+          return `<label class="scn${on ? ' on' : ''}"><input type="checkbox" data-scn="${x.id}" ${on ? 'checked' : ''}><span class="scn-name">${esc(nw(x.label))}</span><span class="scn-days">${days}</span></label>`;
         }).join('')}
         </div>
         ${(H.scenarios || []).includes('outro') ? lab('Qual cenário?', inp('scenarioOther', H.scenarioOther, 'maxlength="120" placeholder="Descreva a situação"')) : ''}
@@ -300,15 +301,15 @@
   function renderOutput() {
     const out = PLAN.compute(H);
     $('planAlerts').innerHTML = out.alerts.length
-      ? out.alerts.map((a) => `<li class="lv-${a.level}"><span class="tag">${a.level}</span><div>${esc(a.text)}</div></li>`).join('')
+      ? out.alerts.map((a) => `<li class="lv-${a.level}"><span class="tag">${a.level}</span><div>${esc(nw(a.text))}</div></li>`).join('')
       : '<li class="lv-baixo"><span class="tag">ok</span><div>Nenhum alerta crítico com os dados informados.</div></li>';
-    $('planSections').innerHTML = out.sections.map((s) => `<div class="panel"><h2>${esc(s.title)}</h2><p>${esc(s.lead)}</p>
-      <table class="tbl"><tbody>${s.rows.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join('')}</tbody></table></div>`).join('');
+    $('planSections').innerHTML = out.sections.map((s) => `<div class="panel"><h2>${esc(s.title)}</h2><p>${esc(nw(s.lead))}</p>
+      <table class="tbl"><tbody>${s.rows.map(([a, b]) => `<tr><td>${esc(nw(a))}</td><td>${esc(nw(b))}</td></tr>`).join('')}</tbody></table></div>`).join('');
     const groups = {};
     out.shopping.forEach((x) => (groups[x.cat] = groups[x.cat] || []).push(x));
     $('planShopping').innerHTML = Object.entries(groups).map(([cat, list]) => `<h3>${esc(cat)}</h3><ul class="shop">${list.map((x) => {
       const id = cat + '|' + x.item;
-      return `<li><label class="check"><input type="checkbox" data-buy="${esc(id)}" ${bought[id] ? 'checked' : ''}><span><b>${esc(x.item)}</b> · ${esc(x.qty)}<br><span class="muted small">${esc(x.where)}${x.note ? ' · ' + esc(x.note) : ''}</span></span></label></li>`;
+      return `<li><label class="check"><input type="checkbox" data-buy="${esc(id)}" ${bought[id] ? 'checked' : ''}><span><b>${esc(x.item)}</b> · ${esc(x.qty)}<br><span class="muted small">${esc(nw(x.where + (x.note ? ' · ' + x.note : '')))}</span></span></label></li>`;
     }).join('')}</ul>`).join('');
     const total = out.shopping.length, done = out.shopping.filter((x) => bought[x.cat + '|' + x.item]).length;
     $('planProgress').textContent = `${done} de ${total} itens prontos`;

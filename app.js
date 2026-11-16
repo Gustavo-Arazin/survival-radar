@@ -237,6 +237,7 @@
 
   // ---------- render ----------
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const nw = (s) => String(s == null ? '' : s).replace(/ ([^ ]{1,14})$/, '\u00a0$1');
   const gmaps = (o, d, mode) => `https://www.google.com/maps/dir/?api=1&origin=${o.lat},${o.lon}&destination=${d.lat},${d.lon}&travelmode=${mode}`;
   const waze = (d) => `https://waze.com/ul?ll=${d.lat},${d.lon}&navigate=yes`;
 
@@ -269,9 +270,9 @@
     $('overall').innerHTML = `Exposição geral: <b>${ov.toUpperCase()}</b>`;
 
     $('risks').innerHTML = m.evaluation.findings.map((x) =>
-      `<li class="lv-${x.level}"><span class="tag">${x.level}</span><div><b>${esc(x.title)}</b><br><span class="muted">${esc(x.detail)}</span></div></li>`).join('');
+      `<li class="lv-${x.level}"><span class="tag">${x.level}</span><div><b>${esc(nw(x.title))}</b><br><span class="muted">${esc(nw(x.detail))}</span></div></li>`).join('');
 
-    $('actionsList').innerHTML = m.actions.map((a) => `<li>${esc(a)}</li>`).join('');
+    $('actionsList').innerHTML = m.actions.map((a) => `<li>${esc(nw(a))}</li>`).join('');
 
     const block = (group, n) => Object.entries(SR.CATEGORIES).filter(([, c]) => c.group === group).map(([k, c]) => {
       const list = (m.items[k] || []).slice(0, n);
@@ -296,7 +297,7 @@
     q.push(m.elevation ? 'Relevo: dados de altitude obtidos (Open-Meteo, ~90 m de resolução).' : 'Relevo: altitude indisponível nesta consulta.');
     q.push('Hospitais: o mapa não informa se há pronto-socorro 24 h nem especialidade pediátrica. Confirme por telefone.');
     q.push('Áreas de risco oficiais (alagamento e deslizamento) ainda não integradas: consulte a Defesa Civil do município.');
-    $('quality').innerHTML = q.map((x) => `<li>${esc(x)}</li>`).join('');
+    $('quality').innerHTML = q.map((x) => `<li>${esc(nw(x))}</li>`).join('');
     $('actionMsg').textContent = '';
   }
 
@@ -340,6 +341,13 @@
     }
   }
 
+  // Texto fixo da página: junta as duas últimas palavras de cada parágrafo (sem viúvas).
+  document.querySelectorAll('main p, main li, main label').forEach((el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let last = null, n;
+    while ((n = walker.nextNode())) if (n.nodeValue.trim()) last = n;
+    if (last) last.nodeValue = last.nodeValue.replace(/ ([^ ]{1,14})(\s*)$/, '\u00a0$1$2');
+  });
   renderSaved();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
