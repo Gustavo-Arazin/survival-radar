@@ -3,7 +3,7 @@ const SHELL = 'sr-shell-v1';
 const TILES = 'sr-tiles-v1';
 const MAX_TILES = 600;
 const ASSETS = [
-  './', 'index.html', 'styles.css', 'app.js', 'rules.js', 'plan.js', 'planui.js', 'manifest.webmanifest', 'icon.svg',
+  './', 'index.html', 'styles.css', 'app.js', 'rules.js', 'plan.js', 'planui.js', 'manifest.webmanifest', 'icon.svg', 'fonts/montserrat-latin-wght-normal.woff2',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];
@@ -29,7 +29,7 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  if (url.hostname === 'tile.openstreetmap.org') {
+  if (url.hostname === 'tile.openstreetmap.org' || url.hostname === 'server.arcgisonline.com') {
     e.respondWith(caches.open(TILES).then(async (c) => {
       const hit = await c.match(req);
       if (hit) return hit;

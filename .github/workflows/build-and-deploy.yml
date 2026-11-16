@@ -78,7 +78,7 @@ jobs:
       - name: Montar site
         run: |
           mkdir -p dist
-          cp index.html styles.css app.js rules.js plan.js planui.js sw.js manifest.webmanifest icon.svg .nojekyll dist/
+          cp -r index.html styles.css app.js rules.js plan.js planui.js sw.js manifest.webmanifest icon.svg fonts .nojekyll dist/
           V=${GITHUB_SHA::7}
           sed -i -E "s#(src|href)=\"(styles\.css|app\.js|rules\.js|plan\.js|planui\.js)\"#\1=\"\2?v=$V\"#g" dist/index.html
           sed -i "s#const SHELL = 'sr-shell-v1'#const SHELL = 'sr-shell-$V'#" dist/sw.js

@@ -25,10 +25,41 @@
   // ---------- mapa ----------
   const map = L.map('map', { zoomControl: true }).setView([-15.78, -47.93], 4);
   window.__srMap = map;
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; colaboradores do OpenStreetMap',
-  }).addTo(map);
+  // Camadas base: satélite (Esri) e vetorial (OpenStreetMap), ambas em monocromático via CSS.
+  const BASES = {
+    sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: 'Imagens &copy; Esri, Maxar, Earthstar Geographics',
+    }),
+    dark: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; colaboradores do OpenStreetMap' }),
+  };
+  let base = (() => { try { return localStorage.getItem('sr_base') || 'sat'; } catch { return 'sat'; } })();
+  function setBase(b) {
+    Object.values(BASES).forEach((l) => map.removeLayer(l));
+    BASES[b].addTo(map);
+    base = b;
+    $('mapwrap').className = 'mapwrap basemap-' + b;
+    document.querySelectorAll('[data-base]').forEach((x) => x.classList.toggle('on', x.dataset.base === b));
+    $('hudMode').textContent = b === 'sat' ? 'SAT_VIEW' : 'VECTOR';
+    try { localStorage.setItem('sr_base', b); } catch {}
+  }
+  document.querySelectorAll('[data-base]').forEach((x) => (x.onclick = () => setBase(x.dataset.base)));
+  setBase(base);
+
+  // HUD: coordenadas do centro em graus, minutos e segundos.
+  const dms = (v, pos, neg) => {
+    const a = Math.abs(v), d = Math.floor(a), mf = (a - d) * 60, m = Math.floor(mf), sec = ((mf - m) * 60).toFixed(1);
+    return `${d}° ${String(m).padStart(2, '0')}' ${sec.padStart(4, '0')}" ${v < 0 ? neg : pos}`;
+  };
+  function hud() {
+    const c = map.getCenter();
+    $('hudLat').textContent = dms(c.lat, 'N', 'S');
+    $('hudLon').textContent = dms(c.lng, 'E', 'W');
+    $('hudZoom').textContent = String(map.getZoom()).padStart(2, '0');
+    $('hudSector').textContent = `${Math.floor((c.lat + 90) * 2)}-${Math.floor((c.lng + 180) * 2)}`;
+  }
+  map.on('move zoom', hud);
+  hud();
+
   const layer = L.layerGroup().addTo(map);
   map.on('click', (e) => analyze(e.latlng.lat, e.latlng.lng, null));
 
@@ -150,8 +181,7 @@
     const radius = +$('radius').value;
     layer.clearLayers();
     map.setView([lat, lon], radius > 10000 ? 11 : 13);
-    L.circle([lat, lon], { radius, color: '#7c8cff', weight: 1, fillOpacity: 0.04 }).addTo(layer);
-    L.marker([lat, lon]).addTo(layer);
+    drawOrigin(lat, lon, radius, $('placeName').value.trim() || 'Local', 'Analisando');
     status('Consultando serviços, infraestrutura e relevo…');
     $('report').hidden = true;
 
@@ -194,6 +224,15 @@
     render(current);
   }
 
+  // Ponto analisado: círculo de raio em linha fina e rótulo no estilo HUD.
+  function drawOrigin(lat, lon, radius, name, sub) {
+    L.circle([lat, lon], { radius, color: '#eeeeee', weight: 1, opacity: 0.5, dashArray: '2 6', fillOpacity: 0 }).addTo(layer);
+    L.marker([lat, lon], {
+      interactive: false,
+      icon: L.divIcon({ className: 'callout', iconSize: [0, 0], html: `<span class="dot"></span><span class="ln"></span><span class="lb">${esc(name)}<small>${esc(sub)}</small></span>` }),
+    }).addTo(layer);
+  }
+
   // ---------- render ----------
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const gmaps = (o, d, mode) => `https://www.google.com/maps/dir/?api=1&origin=${o.lat},${o.lon}&destination=${d.lat},${d.lon}&travelmode=${mode}`;
@@ -201,17 +240,24 @@
 
   function render(m) {
     layer.clearLayers();
-    L.circle([m.lat, m.lon], { radius: m.radius, color: '#7c8cff', weight: 1, fillOpacity: 0.04 }).addTo(layer);
-    L.marker([m.lat, m.lon]).addTo(layer).bindPopup(esc(m.name));
+    drawOrigin(m.lat, m.lon, m.radius, m.name, `${m.lat.toFixed(4)}, ${m.lon.toFixed(4)}`);
+    let scan = 0;
     for (const [k, list] of Object.entries(m.items)) {
       const c = SR.CATEGORIES[k];
       const n = c.group === 'service' ? 3 : 1;
+      scan += list.length;
       for (const x of list.slice(0, n)) {
-        L.circleMarker([x.lat, x.lon], { radius: 7, color: '#111', weight: 1, fillColor: c.color, fillOpacity: 0.95 })
+        L.circleMarker([x.lat, x.lon], { radius: c.group === 'infra' ? 6 : 5, color: c.group === 'infra' ? c.color : '#000', weight: c.group === 'infra' ? 1.5 : 1, fillColor: c.group === 'infra' ? '#000' : c.color, fillOpacity: 0.95 })
           .addTo(layer)
           .bindPopup(`<b>${esc(x.name)}</b><br>${esc(c.label)} · ${SR.fmtDist(x.dist)}<br><a href="${gmaps(m, x, 'driving')}" target="_blank" rel="noopener">Rota</a>`);
       }
     }
+
+    $('hudScan').textContent = scan;
+    $('hudRadius').textContent = SR.fmtDist(m.radius);
+    $('hudElev').textContent = m.elevation && Number.isFinite(m.elevation.point) ? Math.round(m.elevation.point) + 'M' : '—';
+    $('hudRisk').textContent = m.evaluation.overall.toUpperCase();
+    $('hudRisk').style.color = `var(--${m.evaluation.overall})`;
 
     $('report').hidden = false;
     $('repTitle').textContent = m.name;

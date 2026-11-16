@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Survival Radar — Brasil</title>
 <meta name="description" content="Mapa de serviços de emergência, riscos e infraestrutura crítica para qualquer endereço do Brasil. Nada é armazenado em servidor.">
-<meta name="theme-color" content="#0f1115">
+<meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -14,7 +14,7 @@
 <body>
 <header class="top">
   <div class="brand">
-    <span class="logo" aria-hidden="true">◎</span>
+    <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>Survival Radar</h1>
       <p class="sub">Serviços, riscos e infraestrutura crítica para qualquer endereço do Brasil</p>
@@ -57,7 +57,22 @@
     <p class="muted small">O perfil da família vem da aba Plano da casa.</p>
   </section>
 
-  <div id="map" role="application" aria-label="Mapa"></div>
+  <div class="mapwrap basemap-sat" id="mapwrap">
+    <div id="map" role="application" aria-label="Mapa"></div>
+    <div class="mapctl" role="group" aria-label="Camada do mapa">
+      <button type="button" data-base="sat" class="on">Satélite</button>
+      <button type="button" data-base="dark">Vetorial</button>
+    </div>
+    <div class="hud" aria-hidden="true">
+      <div class="grid"></div>
+      <div class="cross"></div>
+      <span class="plus" style="left:25%;top:20%">+</span><span class="plus" style="left:75%;top:60%">+</span><span class="plus" style="left:50%;top:80%">+</span>
+      <div class="box tl">Sector <b id="hudSector">BR</b><br>Zoom <b id="hudZoom">—</b><br>Elev <b id="hudElev">—</b><span class="bar"></span></div>
+      <div class="box tr"><b id="hudLat">—</b><br><b id="hudLon">—</b><span class="bar"></span></div>
+      <div class="box bl">Scan <b id="hudScan">0</b> pontos<br>Raio <b id="hudRadius">—</b><br>Mode <b id="hudMode">SAT_VIEW</b></div>
+      <div class="box br">Exposição<br><b id="hudRisk">—</b><span class="bar"></span></div>
+    </div>
+  </div>
 
   <section class="panel" id="statusPanel" hidden>
     <p id="status"></p>
