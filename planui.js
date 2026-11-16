@@ -6,7 +6,7 @@
   const KEY = 'sr_house_v1';
   const BOUGHT = 'sr_bought_v1';
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const nw = (s) => String(s == null ? '' : s).replace(/ ([^ ]{1,14})$/, '\u00a0$1');
+  const nw = (s) => String(s == null ? '' : s).replace(/ ([^ ]{1,18})$/, '\u00a0$1');
 
   const DEFAULT = {
     horizon: 14,

@@ -237,7 +237,7 @@
 
   // ---------- render ----------
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const nw = (s) => String(s == null ? '' : s).replace(/ ([^ ]{1,14})$/, '\u00a0$1');
+  const nw = (s) => String(s == null ? '' : s).replace(/ ([^ ]{1,18})$/, '\u00a0$1');
   const gmaps = (o, d, mode) => `https://www.google.com/maps/dir/?api=1&origin=${o.lat},${o.lon}&destination=${d.lat},${d.lon}&travelmode=${mode}`;
   const waze = (d) => `https://waze.com/ul?ll=${d.lat},${d.lon}&navigate=yes`;
 
@@ -346,7 +346,7 @@
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let last = null, n;
     while ((n = walker.nextNode())) if (n.nodeValue.trim()) last = n;
-    if (last) last.nodeValue = last.nodeValue.replace(/ ([^ ]{1,14})(\s*)$/, '\u00a0$1$2');
+    if (last) last.nodeValue = last.nodeValue.replace(/ ([^ ]{1,18})(\s*)$/, '\u00a0$1$2');
   });
   renderSaved();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

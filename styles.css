@@ -197,3 +197,5 @@ label.inline input { width: 90px; flex: none; }
 .links { flex: 0 0 auto; }
 .tbl td:first-child { width: 36%; }
 .risks li > div { min-width: 0; }
+.scn-grid { grid-auto-rows: 1fr; }
+td, .scn-name, li { overflow-wrap: break-word; }
