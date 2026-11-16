@@ -115,13 +115,41 @@
     try { dataIndex = await fetchJSON('data/index.json', { cache: 'no-cache' }, 15000); } catch { dataIndex = null; }
     return dataIndex;
   }
+  const officialIdx = {};
+  async function loadOfficial(name) {
+    if (officialIdx[name] !== undefined) return officialIdx[name];
+    try { officialIdx[name] = await fetchJSON(`data/${name}/index.json`, { cache: 'no-cache' }, 15000); } catch { officialIdx[name] = null; }
+    return officialIdx[name];
+  }
+  async function officialRows(name, lat, lon, maxR) {
+    const idx = await loadOfficial(name);
+    if (!idx) return null;
+    const have = new Set(idx.tiles);
+    const keys = SR.tilesFor(lat, lon, maxR, 0.5).filter((k) => have.has(k));
+    const parts = await Promise.all(keys.map((k) => fetchJSON(`data/${name}/${k}.json?b=${encodeURIComponent(idx.built)}`, {}, 30000).catch(() => [])));
+    return { rows: parts.flat(), idx };
+  }
   async function localItems(lat, lon, radius) {
     const idx = await loadIndex();
     if (!idx) return null;
     const have = new Set(idx.tiles);
     const keys = SR.tilesFor(lat, lon, SR.MAX_RADIUS, idx.tile).filter((k) => have.has(k));
-    const parts = await Promise.all(keys.map((k) => fetchJSON(`data/t/${k}.json?b=${encodeURIComponent(idx.built)}`, {}, 30000).catch(() => [])));
-    return { items: SR.fromTiles(parts.flat(), { lat, lon }, radius, idx.cats), built: idx.built };
+    const [parts, cnes, sgb] = await Promise.all([
+      Promise.all(keys.map((k) => fetchJSON(`data/t/${k}.json?b=${encodeURIComponent(idx.built)}`, {}, 30000).catch(() => []))),
+      officialRows('cnes', lat, lon, radius),
+      officialRows('sgb', lat, lon, 3000),
+    ]);
+    const items = SR.fromTiles(parts.flat(), { lat, lon }, radius, idx.cats);
+    const sources = { osm: idx.built };
+    if (cnes) {
+      const c = SR.fromCnes(cnes.rows, { lat, lon }, radius, cnes.idx.tipos);
+      if (c.hospital.length) items.hospital = c.hospital;
+      if (c.emergency.length) items.emergency = c.emergency;
+      sources.cnes = cnes.idx.built;
+    }
+    let geoRisk = null;
+    if (sgb) { geoRisk = SR.geoRiskFrom(sgb.rows, { lat, lon }); sources.sgb = sgb.idx.built; }
+    return { items, built: idx.built, geoRisk, sources };
   }
 
   async function elevation(lat, lon) {
@@ -192,16 +220,16 @@
       elevation(lat, lon),
       address ? Promise.resolve(address) : reverse(lat, lon),
     ]);
-    let items, built = null;
+    let items, built = null, geoRisk = null, sources = {};
     if (loc.status === 'fulfilled' && loc.value) {
-      items = loc.value.items; built = loc.value.built;
+      items = loc.value.items; built = loc.value.built; geoRisk = loc.value.geoRisk; sources = loc.value.sources;
     } else {
       status('Base local indisponível; consultando o OpenStreetMap ao vivo (pode demorar)…');
       try { items = SR.parseOverpass(await overpass(SR.buildOverpassQuery(lat, lon, radius)), { lat, lon }); }
       catch { status('Os servidores do OpenStreetMap estão ocupados. Tente de novo em alguns minutos.'); return; }
     }
     current = {
-      dataBuilt: built,
+      dataBuilt: built, geoRisk, sources,
       name: $('placeName').value.trim() || 'Local',
       address: addr.status === 'fulfilled' ? addr.value : null,
       lat, lon, radius, ts: Date.now(),
@@ -280,6 +308,7 @@
       if (!list.length) return group === 'service' ? `<div class="cat"><h3><i style="background:${c.color}"></i>${c.label}</h3><p class="muted small">Nada encontrado no raio. Pode ser lacuna de dados.</p></div>` : '';
       return `<div class="cat"><h3><i style="background:${c.color}"></i>${c.label}</h3><ul>${list.map((x) => `
         <li><div><b>${esc(nw(x.name))}</b> <span class="muted">·&nbsp;${SR.fmtDist(x.dist).replace(' ', '&nbsp;')}</span>
+        ${x.official ? `<br><span class="badges">${[x.tipo, x.h24 && '24 h', x.ped && 'pediátrico (nome)', x.obst && 'maternidade', x.neo && 'neonatal', x.sus && 'SUS'].filter(Boolean).map((b) => `<span class="badge">${esc(b)}</span>`).join('')}</span>` : ''}
         ${x.address ? `<br><span class="muted small">${esc(x.address)}</span>` : ''}
         ${x.phone ? `<br><span class="small">${esc(x.phone)}</span>` : ''}</div>
         <div class="links"><a href="${gmaps(m, x, 'driving')}" target="_blank" rel="noopener">Carro</a>
@@ -294,10 +323,12 @@
     const svc = ['hospital', 'emergency', 'fire', 'police'].reduce((s, k) => s + (m.counts[k] || 0), 0);
     q.push(`${svc} serviços de emergência mapeados no raio de ${SR.fmtDist(m.radius)}.`);
     q.push(m.dataBuilt ? `Base nacional OpenStreetMap atualizada em ${new Date(m.dataBuilt).toLocaleDateString('pt-BR')}.` : 'Dados consultados ao vivo no OpenStreetMap.');
+    const src = m.sources || {};
+    q.push(src.cnes ? `Hospitais e prontos-socorros: CNES (Ministério da Saúde), base de ${new Date(src.cnes).toLocaleDateString('pt-BR')}. "Pediátrico" é indício pelo nome; confirme por telefone.` : 'Hospitais: OpenStreetMap (CNES indisponível nesta consulta).');
+    q.push(src.sgb ? `Áreas de risco geológico: Serviço Geológico do Brasil, base de ${new Date(src.sgb).toLocaleDateString('pt-BR')}. Só municípios mapeados pelo SGB.` : 'Áreas de risco geológico oficiais indisponíveis nesta consulta.');
+    q.push('Barragens: OpenStreetMap, sem a classificação oficial de risco (o SNISB não publica base consultável).');
     if (svc < 3) q.push('Poucos serviços mapeados: a cobertura do OpenStreetMap nesta região pode ser fraca. Confirme localmente.');
     q.push(m.elevation ? 'Relevo: dados de altitude obtidos (Open-Meteo, ~90 m de resolução).' : 'Relevo: altitude indisponível nesta consulta.');
-    q.push('Hospitais: o mapa não informa se há pronto-socorro 24 h nem especialidade pediátrica. Confirme por telefone.');
-    q.push('Áreas de risco oficiais (alagamento e deslizamento) ainda não integradas: consulte a Defesa Civil do município.');
     $('quality').innerHTML = q.map((x) => `<li>${esc(nw(x))}</li>`).join('');
     $('actionMsg').textContent = '';
   }

@@ -220,6 +220,50 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     return out;
   }
 
+  // Ponto dentro de polígono (anel [[lat,lon],...]), por ray casting.
+  function inRing(p, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [yi, xi] = ring[i], [yj, xj] = ring[j];
+      if (((yi > p.lat) !== (yj > p.lat)) && (p.lon < ((xj - xi) * (p.lat - yi)) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  const CNES_HOSP = [5, 7, 15], CNES_URG = [20, 21, 73];
+  // Linhas do CNES -> itens hospital/emergency com tipo e marcadores (24 h, maternidade, neonatal, pediátrico, SUS).
+  function fromCnes(rows, origin, radius, tipos) {
+    const out = { hospital: [], emergency: [] };
+    const seen = new Set();
+    for (const r of rows) {
+      if (seen.has(r[7])) continue; seen.add(r[7]);
+      const dist = haversine(origin, { lat: r[0], lon: r[1] });
+      if (dist > radius) continue;
+      const cat = CNES_HOSP.includes(r[5]) ? 'hospital' : CNES_URG.includes(r[5]) ? 'emergency' : null;
+      if (!cat) continue;
+      out[cat].push({ cat, lat: r[0], lon: r[1], dist, name: r[2] || SINGULAR[cat], phone: r[3] || null, address: r[4] || null,
+        tipo: (tipos && tipos[r[5]]) || '', h24: !!(r[6] & 1), obst: !!(r[6] & 2), neo: !!(r[6] & 4), ped: !!(r[6] & 8), sus: !!(r[6] & 16), osm: 'cnes/' + r[7], official: true });
+    }
+    out.hospital.sort((a, b) => a.dist - b.dist); out.emergency.sort((a, b) => a.dist - b.dist);
+    return out;
+  }
+
+  // Setores de risco do SGB: dentro de algum? qual o mais próximo?
+  function geoRiskFrom(rows, origin) {
+    let inside = null, nearest = null;
+    const seen = new Set();
+    for (const r of rows) {
+      if (seen.has(r[4])) continue; seen.add(r[4]);
+      for (const ring of r[5]) {
+        const sector = { grau: r[0], tipo: r[1], local: r[2], munic: r[3], id: r[4] };
+        if (inRing(origin, ring)) { if (!inside || /muito/i.test(sector.grau)) inside = sector; }
+        const d = distToPolyline(origin, ring.map(([a, b]) => ({ lat: a, lon: b })));
+        if (!nearest || d < nearest.dist) nearest = { ...sector, dist: d };
+      }
+    }
+    return { inside, nearest };
+  }
+
   const LEVEL_RANK = { alto: 3, moderado: 2, baixo: 1, info: 0 };
 
   function fmtDist(m) {
@@ -273,12 +317,22 @@ way(around:3000,${c})[man_made=pipeline]->.p;
       else add('baixo', 'Relevo sem depressão relevante', `Altitude ${Math.round(e.point)} m; mediana do entorno ${Math.round(med)} m.`);
     }
 
+    // Setores de risco geológico oficiais (SGB)
+    const g = ctx.geoRisk;
+    if (g && g.inside) add('alto', `Dentro de setor de risco geológico (${g.inside.grau.toLowerCase()})`, `${g.inside.tipo || 'Risco geológico'} · ${g.inside.local} · ${g.inside.munic}. Fonte: Serviço Geológico do Brasil. Combine o plano com a Defesa Civil do município.`);
+    else if (g && g.nearest && g.nearest.dist < 300) add('moderado', `Setor de risco geológico a ${fmtDist(g.nearest.dist)}`, `${g.nearest.tipo || 'Risco geológico'} (grau ${g.nearest.grau.toLowerCase()}) · ${g.nearest.local}. Fonte: Serviço Geológico do Brasil.`);
+    else if (g && g.nearest && g.nearest.dist < 1000) add('info', `Setor de risco geológico a ${fmtDist(g.nearest.dist)}`, `${g.nearest.tipo || 'Risco geológico'} (grau ${g.nearest.grau.toLowerCase()}). Fonte: Serviço Geológico do Brasil.`);
+
     // Acesso a serviços
     const hosp = [first('hospital'), first('emergency')].filter(Boolean).sort((a, b) => a.dist - b.dist)[0];
     const rLabel = fmtDist(ctx.radius);
     if (!hosp) add('alto', `Nenhum hospital ou pronto atendimento em ${rLabel}`, 'Pode ser lacuna de dados do OpenStreetMap. Identifique manualmente o pronto-socorro de referência e salve aqui.');
     else if (hosp.dist > 10000) add('moderado', `Atendimento de urgência mais próximo a ${fmtDist(hosp.dist)}`, `${hosp.name}. Distância alta para emergência; planeje transporte e teste o trajeto.`);
     else add('baixo', `Atendimento de urgência a ${fmtDist(hosp.dist)}`, hosp.name);
+
+    const ped = [...(it.hospital || []), ...(it.emergency || [])].filter((x) => x.ped).sort((a, b) => a.dist - b.dist)[0];
+    if (ped) add('info', `Atendimento pediátrico a ${fmtDist(ped.dist)}`, `${ped.name}${ped.h24 ? ' · 24 h' : ''}. Indício pelo nome no CNES: confirme por telefone.`);
+    else if ((ctx.profile || {}).infants > 0 && (it.hospital || []).some((x) => x.official)) add('moderado', 'Nenhuma unidade pediátrica identificada no raio', 'O CNES não indica pediatria pelo nome das unidades próximas. Confirme com o plano de saúde qual pronto-socorro atende crianças.');
 
     const fire = first('fire');
     if (!fire) add('moderado', `Nenhum quartel de bombeiros em ${rLabel}`, 'Pode ser lacuna de dados. Tempo de resposta a incêndio tende a ser maior.');
@@ -359,7 +413,7 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     ].join('\n');
   }
 
-  const api = { haversine, distToSegment, distToPolyline, point, median, classify, buildOverpassQuery, parseOverpass, radiusFor, tilesFor, fromTiles, MAX_RADIUS, evaluate, recommend, reportText, aiBriefing, fmtDist, CATEGORIES, LEVEL_RANK };
+  const api = { haversine, distToSegment, distToPolyline, point, median, classify, buildOverpassQuery, parseOverpass, radiusFor, tilesFor, fromTiles, fromCnes, geoRiskFrom, inRing, MAX_RADIUS, evaluate, recommend, reportText, aiBriefing, fmtDist, CATEGORIES, LEVEL_RANK };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SR = api;
 })(typeof self !== 'undefined' ? self : this);

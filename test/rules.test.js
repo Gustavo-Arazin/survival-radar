@@ -19,3 +19,16 @@ const m={...ctx,name:'Casa',address:'Av. Paulista',lat:o.lat,lon:o.lon,ts:Date.n
 console.log(SR.reportText(m).slice(0,900));
 console.log('query len', SR.buildOverpassQuery(o.lat,o.lon,10000).length);
 console.log('ring pt', SR.point(o.lat,o.lon,600,90), SR.fmtDist(SR.haversine(o,SR.point(o.lat,o.lon,600,90))));
+// CNES e SGB
+const o2 = { lat: -23.5614, lon: -46.6559 };
+const cn = SR.fromCnes([[-23.557,-46.662,'Hospital Infantil X','11 1','Rua A',5,1|8|16,'111'],[-23.55,-46.64,'Upa Centro','','',73,1,'222'],[-23.2,-46.2,'Longe','','',5,0,'333'],[-23.56,-46.65,'Clínica','','',2,0,'444']], o2, 10000, {5:'Hospital geral',73:'Pronto atendimento'});
+if (cn.hospital.length !== 1 || cn.emergency.length !== 1 || !cn.hospital[0].ped || !cn.hospital[0].h24) throw new Error('cnes');
+const sq = [[-23.562,-46.657],[-23.562,-46.655],[-23.560,-46.655],[-23.560,-46.657],[-23.562,-46.657]];
+const gr = SR.geoRiskFrom([['Muito alto','Deslizamento','Rua B','São Paulo-SP','SP_1',[sq]]], o2);
+if (!gr.inside || gr.inside.grau !== 'Muito alto') throw new Error('sgb inside');
+const gr2 = SR.geoRiskFrom([['Alto','Inundação','Rua C','SP','SP_2',[sq.map(([a,b])=>[a-0.003,b])]]], o2);
+if (gr2.inside || !(gr2.nearest.dist > 100 && gr2.nearest.dist < 400)) throw new Error('sgb near ' + JSON.stringify(gr2.nearest && gr2.nearest.dist));
+const ev2 = SR.evaluate({ items: { ...cn }, radius: 10000, geoRisk: gr, profile: { infants: 1, car: true } });
+if (!ev2.findings.some(f => /setor de risco geológico/.test(f.title) && f.level === 'alto')) throw new Error('eval sgb');
+if (!ev2.findings.some(f => /pediátrico/.test(f.title))) throw new Error('eval ped');
+console.log('CNES/SGB OK', ev2.findings.map(f=>f.level+' '+f.title));

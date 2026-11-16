@@ -222,7 +222,7 @@
     if (soon) out.alerts.push({ level: 'moderado', text: `${soon} item(ns) vencem em até 30 dias: consuma primeiro e reponha.` });
 
     // 9. Cenários sugeridos pelos endereços analisados
-    const map = [[/Barragem/i, 'barragem'], [/Refinaria|química|Depósito de combustível|Duto|nuclear/i, 'quimico'], [/Ponto baixo/i, 'chuva'], [/Subestação|Usina de energia/i, 'apagao']];
+    const map = [[/setor de risco geológico/i, 'chuva'], [/Barragem/i, 'barragem'], [/Refinaria|química|Depósito de combustível|Duto|nuclear/i, 'quimico'], [/Ponto baixo/i, 'chuva'], [/Subestação|Usina de energia/i, 'apagao']];
     const sugg = new Set();
     for (const p of props) for (const f of (p.analysis && p.analysis.findings) || []) {
       if (!['alto', 'moderado', 'info'].includes(f.level)) continue;

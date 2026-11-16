@@ -39,6 +39,7 @@ jobs:
           if git fetch --depth=1 origin gh-pages && git cat-file -e origin/gh-pages:data/index.json; then
             git archive origin/gh-pages data | tar -x -C dist
             echo "ok=true" >> "$GITHUB_OUTPUT"
+            if [ -s dist/data/cnes/index.json ] && [ -s dist/data/sgb/index.json ]; then echo "official=true" >> "$GITHUB_OUTPUT"; fi
             echo "Base reaproveitada: $(du -sh dist/data | cut -f1)"
           fi
 
@@ -74,6 +75,11 @@ jobs:
       - name: Gerar blocos estáticos
         if: steps.reuse.outputs.ok != 'true'
         run: node pipeline/build-tiles.js filtered.geojsonseq dist/data
+
+      - name: Bases oficiais (CNES e SGB)
+        if: steps.reuse.outputs.official != 'true'
+        continue-on-error: true
+        run: python3 pipeline/build-official.py dist/data && du -sh dist/data/cnes dist/data/sgb
 
       - name: Montar site
         run: |

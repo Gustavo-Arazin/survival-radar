@@ -248,3 +248,5 @@ label.inline { display: inline-flex; width: auto; max-width: 100%; }
 .tbl tr.inv-bad td:first-child, .tbl tr.inv-warn td:first-child { color: inherit; }
 .passrow { margin-top: 10px; }
 #planPass { width: 220px; }
+.badges { display: inline-flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+.badge { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--accent); }
