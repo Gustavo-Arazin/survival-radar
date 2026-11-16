@@ -200,3 +200,4 @@ label.inline input { width: 90px; flex: none; }
 .scn-grid { grid-auto-rows: 1fr; }
 td, .scn-name, li { overflow-wrap: break-word; }
 label.inline { display: inline-flex; width: auto; max-width: 100%; }
+.row > label.inline { flex: 0 0 auto; }

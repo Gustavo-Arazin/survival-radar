@@ -309,7 +309,7 @@
     out.shopping.forEach((x) => (groups[x.cat] = groups[x.cat] || []).push(x));
     $('planShopping').innerHTML = Object.entries(groups).map(([cat, list]) => `<h3>${esc(cat)}</h3><ul class="shop">${list.map((x) => {
       const id = cat + '|' + x.item;
-      return `<li><label class="check"><input type="checkbox" data-buy="${esc(id)}" ${bought[id] ? 'checked' : ''}><span><b>${esc(x.item)}</b> · ${esc(x.qty)}<br><span class="muted small">${esc(nw(x.where + (x.note ? ' · ' + x.note : '')))}</span></span></label></li>`;
+      return `<li><label class="check"><input type="checkbox" data-buy="${esc(id)}" ${bought[id] ? 'checked' : ''}><span><b>${esc(nw(x.item))}</b> · ${esc(x.qty)}<br><span class="muted small">${esc(nw(x.where + (x.note ? ' · ' + x.note : '')))}</span></span></label></li>`;
     }).join('')}</ul>`).join('');
     const total = out.shopping.length, done = out.shopping.filter((x) => bought[x.cat + '|' + x.item]).length;
     $('planProgress').textContent = `${done} de ${total} itens prontos`;

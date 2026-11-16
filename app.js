@@ -278,7 +278,7 @@
       const list = (m.items[k] || []).slice(0, n);
       if (!list.length) return group === 'service' ? `<div class="cat"><h3><i style="background:${c.color}"></i>${c.label}</h3><p class="muted small">Nada encontrado no raio. Pode ser lacuna de dados.</p></div>` : '';
       return `<div class="cat"><h3><i style="background:${c.color}"></i>${c.label}</h3><ul>${list.map((x) => `
-        <li><div><b>${esc(x.name)}</b> <span class="muted">· ${SR.fmtDist(x.dist)}</span>
+        <li><div><b>${esc(nw(x.name))}</b> <span class="muted">·&nbsp;${SR.fmtDist(x.dist).replace(' ', '&nbsp;')}</span>
         ${x.address ? `<br><span class="muted small">${esc(x.address)}</span>` : ''}
         ${x.phone ? `<br><span class="small">${esc(x.phone)}</span>` : ''}</div>
         <div class="links"><a href="${gmaps(m, x, 'driving')}" target="_blank" rel="noopener">Carro</a>
