@@ -199,3 +199,4 @@ label.inline input { width: 90px; flex: none; }
 .risks li > div { min-width: 0; }
 .scn-grid { grid-auto-rows: 1fr; }
 td, .scn-name, li { overflow-wrap: break-word; }
+label.inline { display: inline-flex; width: auto; max-width: 100%; }
