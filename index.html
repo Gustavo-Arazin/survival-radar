@@ -126,7 +126,7 @@
 <main data-view="plano" hidden>
   <section class="panel">
     <h2>Plano da casa</h2>
-    <p class="muted small">Preencha a família, a residência e o carro. As quantidades se calculam sozinhas. Tudo fica só neste aparelho: faça backup.</p>
+    <p class="muted small">Preencha a família, a residência e o carro (passo 1). As quantidades e a lista de compras se calculam sozinhas logo abaixo (passo 2). Tudo fica só neste aparelho: faça backup.</p>
     <div class="row wrap actions">
       <button id="planCopy" type="button">Copiar plano</button>
       <button id="planPrint" type="button">Imprimir</button>
@@ -135,6 +135,9 @@
     </div>
     <p id="planMsg" class="muted small" aria-live="polite"></p>
   </section>
+  <h2 class="formtitle">1. Dados da família e da casa</h2>
+  <div id="planForm"></div>
+  <h2 class="formtitle">2. Resultado</h2>
   <section class="panel">
     <h2>Alertas</h2>
     <ul id="planAlerts" class="risks"></ul>
@@ -147,8 +150,6 @@
       <div id="planShopping"></div>
     </section>
   </div>
-  <h2 class="formtitle">Dados da família e da casa</h2>
-  <div id="planForm"></div>
 </main>
 
 <script src="rules.js"></script>

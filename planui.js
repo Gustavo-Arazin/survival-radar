@@ -43,11 +43,12 @@
   function personCard(p, i) {
     const mo = PLAN.ageMonths(p.birth);
     const infant = mo != null && mo < 12;
-    return `<div class="card"><div class="cardhead"><b>${esc(p.name || 'Pessoa')}</b><span class="muted small">${PLAN.fmtAge(mo)}</span><button type="button" class="del" data-del="people.${i}" aria-label="Remover">×</button></div>
+    return `<div class="card"><div class="cardhead"><b>${esc(p.name || 'Pessoa')}</b><span class="muted small" data-age="${i}">${PLAN.fmtAge(mo)}</span><button type="button" class="del" data-del="people.${i}" aria-label="Remover">×</button></div>
       <div class="grid3">
         ${lab('Nome ou papel', inp(`people.${i}.name`, p.name, 'maxlength="30"'))}
-        ${lab('Mês e ano de nascimento', inp(`people.${i}.birth`, p.birth, 'type="month"'))}
+        ${lab('Data de nascimento', inp(`people.${i}.birth`, p.birth, 'type="date" min="1900-01-01" max="' + new Date().toISOString().slice(0, 10) + '"'))}
         ${lab('Sexo', sel(`people.${i}.sex`, p.sex || '', [['', '—'], ['f', 'Feminino'], ['m', 'Masculino']]))}
+        ${lab('Tipo sanguíneo', sel(`people.${i}.blood`, p.blood || '', [['', 'Não sei'], ['A+', 'A+'], ['A-', 'A−'], ['B+', 'B+'], ['B-', 'B−'], ['AB+', 'AB+'], ['AB-', 'AB−'], ['O+', 'O+'], ['O-', 'O−']]))}
         ${lab('Peso (kg, opcional)', inp(`people.${i}.weight`, p.weight, 'type="number" min="0" step="0.1"'))}
         ${infant ? lab('Alimentação', sel(`people.${i}.feeding`, p.feeding || 'peito', [['peito', 'Só leite materno'], ['misto', 'Misto'], ['formula', 'Fórmula']])) : ''}
       </div>
@@ -76,7 +77,8 @@
   function petCard(p, i) {
     return `<div class="card"><div class="cardhead"><b>${esc(p.name || 'Animal')}</b><button type="button" class="del" data-del="pets.${i}" aria-label="Remover">×</button></div>
       <div class="grid3">
-        ${lab('Espécie', sel(`pets.${i}.species`, p.species || 'cao', [['cao', 'Cão'], ['gato', 'Gato'], ['outro', 'Outro']]))}
+        ${lab('Espécie', sel(`pets.${i}.species`, p.species || 'cao', PLAN.PET_SPECIES))}
+        ${p.species === 'outro' ? lab('Qual animal?', inp(`pets.${i}.other`, p.other, 'maxlength="30" placeholder="Ex.: tartaruga, furão"')) : ''}
         ${lab('Nome', inp(`pets.${i}.name`, p.name, 'maxlength="20"'))}
         ${lab('Peso (kg)', inp(`pets.${i}.weight`, p.weight, 'type="number" min="0" step="0.1"'))}
         ${lab('Ração por dia (g, se souber)', inp(`pets.${i}.foodPerDay`, p.foodPerDay, 'type="number" min="0"'))}
@@ -87,7 +89,10 @@
     const r = H.residence, v = H.vehicle, u = r.utilities || (r.utilities = {});
     $('planForm').innerHTML = `
       <div class="panel"><h2>Horizonte do estoque</h2>
-        ${sel('horizon', H.horizon, [['3', '3 dias (mínimo)'], ['14', '14 dias (recomendado)'], ['30', '30 dias'], ['90', '90 dias']])}
+        <div class="grid3">
+          ${lab('Período', sel('horizonMode', [3, 14, 30, 90].includes(+H.horizon) && !H.horizonCustom ? String(H.horizon) : 'custom', [['3', '3 dias (mínimo)'], ['14', '14 dias (recomendado)'], ['30', '30 dias'], ['90', '90 dias'], ['custom', 'Personalizado']]))}
+          ${[3, 14, 30, 90].includes(+H.horizon) && !H.horizonCustom ? '' : lab('Número de dias', inp('horizon', H.horizon, 'type="number" min="1" max="365"'))}
+        </div>
       </div>
       <div class="panel"><h2>Pessoas</h2>${H.people.map(personCard).join('')}
         <button type="button" data-add="people">+ Pessoa</button></div>
@@ -141,15 +146,31 @@
   }
   $('planForm').addEventListener('input', (e) => {
     const el = e.target;
-    if (!el.dataset.p) return;
+    const p = el.dataset.p;
+    if (!p) return;
     const v = el.type === 'checkbox' ? el.checked : el.value;
-    setPath(el.dataset.p, el.dataset.p === 'horizon' ? +v : v);
+    if (p === 'horizonMode') {
+      if (v === 'custom') { H.horizonCustom = true; } else { H.horizonCustom = false; H.horizon = +v; }
+      save(); rerender(); return;
+    }
+    setPath(p, p === 'horizon' ? Math.max(1, Math.min(365, +v || 1)) : v);
+    if (/\.birth$/.test(p)) {
+      const i = p.split('.')[1];
+      const span = document.querySelector(`[data-age="${i}"]`);
+      if (span) span.textContent = PLAN.fmtAge(PLAN.ageMonths(v));
+    }
     save(); renderOutput();
+  });
+  // Redesenha só quando o campo perde o foco (não interrompe a digitação).
+  $('planForm').addEventListener('focusout', (e) => {
+    const p = e.target.dataset.p || '';
+    if (/(\.birth|\.name)$/.test(p)) rerender();
   });
   $('planForm').addEventListener('change', (e) => {
     const p = e.target.dataset.p || '';
-    if (/(birth|controlled|name)$/.test(p)) { const y = scrollY; renderForm(); scrollTo(0, y); }
+    if (/(controlled|species)$/.test(p)) rerender();
   });
+  function rerender() { const y = scrollY; const a = document.activeElement && document.activeElement.dataset.p; renderForm(); renderOutput(); scrollTo(0, y); if (a) { const el = document.querySelector(`[data-p="${a}"]`); if (el && el.type !== 'date') el.focus(); } }
   $('planForm').addEventListener('click', (e) => {
     const add = e.target.dataset.add, del = e.target.dataset.del;
     if (add) { H[add].push(add === 'people' ? { name: '', sex: '', birth: '' } : add === 'pets' ? { species: 'cao', name: '', weight: '' } : { name: '', perDay: 1, stock: '', unit: 'comprimidos', controlled: false }); }

@@ -8,10 +8,12 @@
 
   function ageMonths(birth, today) {
     if (!birth) return null;
-    const [y, m] = String(birth).split('-').map(Number);
-    if (!y || !m) return null;
+    const [y, m, d] = String(birth).split('-').map(Number);
     const t = today || new Date();
-    return Math.max(0, (t.getFullYear() - y) * 12 + (t.getMonth() + 1 - m));
+    if (!y || !m || y < 1900 || y > t.getFullYear()) return null;
+    let mo = (t.getFullYear() - y) * 12 + (t.getMonth() + 1 - m);
+    if (d && t.getDate() < d) mo -= 1;
+    return mo < 0 ? null : mo;
   }
 
   function stage(mo) {
@@ -86,6 +88,11 @@
   }
 
   // ---------- pets ----------
+  const PET_SPECIES = [['cao', 'Cão'], ['gato', 'Gato'], ['ave', 'Ave'], ['coelho', 'Coelho'], ['roedor', 'Roedor (hamster, porquinho-da-índia, chinchila)'], ['peixe', 'Peixe'], ['reptil', 'Réptil'], ['outro', 'Outro']];
+  const DRINKS = ['cao', 'gato', 'coelho', 'roedor'];
+  const petName = (pet) => pet.name || (pet.species === 'outro' && pet.other) || (PET_SPECIES.find((x) => x[0] === pet.species) || [0, 'Animal'])[1];
+  const petWaterDay = (pet) => DRINKS.includes(pet.species || 'cao') ? 0.06 * Math.max(0.1, +pet.weight || 0) : 0;
+
   function petFood(pet) {
     const kg = Math.max(0.5, +pet.weight || 0);
     if (pet.foodPerDay) return { g: +pet.foodPerDay, estimated: false };
@@ -118,7 +125,7 @@
     let pot = 0, hyg = 0;
     for (const p of people) { const w = waterPerDay(p, p.mo); pot += w.pot; hyg += w.hygiene; }
     let petWater = 0;
-    for (const pet of h.pets || []) petWater += 0.06 * Math.max(0.5, +pet.weight || 0);
+    for (const pet of h.pets || []) petWater += petWaterDay(pet);
     const potTotal = ceil((pot + petWater) * days);
     const hygTotal = ceil(hyg * days);
     const tank = +((h.residence || {}).waterTank) || 0;
@@ -177,13 +184,16 @@
     const petRows = [];
     for (const pet of h.pets || []) {
       const f = petFood(pet);
-      const name = pet.name || (pet.species === 'cao' ? 'Cão' : pet.species === 'gato' ? 'Gato' : 'Animal');
+      const name = petName(pet);
       if (f.g) {
         const kg = r1((f.g * days * 1.1) / 1000);
         petRows.push([`${name} (${pet.weight || '?'} kg): ração`, `${f.g} g/dia${f.estimated ? ' (estimativa)' : ''} · ${String(kg).replace('.', ',')} kg no período`]);
         buy('Pets', `Ração (${name})`, `${String(kg).replace('.', ',')} kg`, 'Pet shop ou atacarejo', 'Confira a tabela da embalagem; a estimativa vale para animal adulto e castrado.');
-      } else petRows.push([`${name}: alimento`, 'informe a quantidade diária']);
-      petRows.push([`${name}: água`, `${r1(0.06 * Math.max(0.5, +pet.weight || 0)).toString().replace('.', ',')} L/dia (já somada à água potável)`]);
+      } else petRows.push([`${name}: alimento`, 'informe a quantidade diária em gramas para calcular o estoque']);
+      if (petWaterDay(pet)) petRows.push([`${name}: água`, `${br(petWaterDay(pet))} L/dia (já somada à água potável)`]);
+      else if (pet.species === 'peixe') petRows.push([`${name}: aquário`, 'sem energia, o filtro e o aquecedor param: tenha bomba de ar a pilha']);
+      else if (pet.species === 'reptil') petRows.push([`${name}: aquecimento`, 'sem energia, a lâmpada de aquecimento para: planeje fonte de calor alternativa']);
+      else if (pet.species === 'ave') petRows.push([`${name}: água`, 'bebedouro sempre cheio; reserve 1 L por semana']);
       if (pet.species === 'gato') buy('Pets', `Areia higiênica (${name})`, `${ceil(days / 14)} pacotes de 4 kg`, 'Pet shop', '');
       buy('Pets', `Caixa de transporte, guia e documentos de vacina (${name})`, '1', 'Pet shop', 'Necessário se precisar sair de casa.');
     }
@@ -205,6 +215,15 @@
       }
     }
     if (medRows.length) out.sections.push({ title: 'Medicação', lead: `Meta: ${target} dias de margem. Guarde cópia das receitas junto com os documentos.`, rows: medRows });
+
+    // Ficha de emergência
+    const med = people.map((p) => [p.name || 'Pessoa', [
+      `idade: ${fmtAge(p.mo)}`, p.blood ? `sangue: ${p.blood}` : 'sangue: não informado',
+      p.weight ? `peso: ${p.weight} kg` : '', p.conditions ? `condições/alergias: ${p.conditions}` : '',
+      (h.meds || []).filter((m) => m.name && m.who === p.name).map((m) => m.name + (m.controlled ? ' (controlado)' : '')).join(', ') ? 'medicação: ' + (h.meds || []).filter((m) => m.name && m.who === p.name).map((m) => m.name).join(', ') : '',
+    ].filter(Boolean).join(' · ')]);
+    if (med.length) out.sections.push({ title: 'Ficha de emergência da família', lead: 'Imprima e deixe na bolsa de saída e na carteira de cada adulto. É o que o socorrista precisa saber.', rows: med });
+    if (people.some((p) => !p.blood)) out.alerts.push({ level: 'moderado', text: 'Tipo sanguíneo não informado para todos: confira na carteira de doador, no exame de pré-natal ou no teste do pezinho.' });
 
     // Dinheiro
     const c = cash((h.money || {}).monthly, days);
@@ -301,7 +320,7 @@
     return out;
   }
 
-  const api = { compute, ageMonths, stage, fmtAge, waterPerDay, kcalPerDay, diapersPerDay, diaperSize, petFood, cash, FOOD };
+  const api = { PET_SPECIES, compute, ageMonths, stage, fmtAge, waterPerDay, kcalPerDay, diapersPerDay, diaperSize, petFood, cash, FOOD };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PLAN = api;
 })(typeof self !== 'undefined' ? self : this);
