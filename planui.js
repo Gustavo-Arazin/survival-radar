@@ -9,6 +9,7 @@
 
   const DEFAULT = {
     horizon: 14,
+    scenarios: ['apagao', 'chuva', 'invasao'], scenarioOther: '',
     people: [{ name: 'Adulto 1', sex: '', birth: '' }, { name: 'Adulto 2', sex: '', birth: '' }],
     pets: [],
     vehicle: { has: false, armored: false, tank: '', kmPerL: '' },
@@ -110,6 +111,13 @@
           ${[3, 14, 30, 90].includes(+H.horizon) && !H.horizonCustom ? '' : lab('Número de dias', inp('horizon', H.horizon, 'type="number" min="1" max="365"'))}
         </div>
       </div>
+      <div class="panel"><h2>Cenários a simular</h2>
+        <p class="muted small">Marque todos que se aplicam. O plano junta os itens de todos, sem repetir.</p>
+        <div class="grid2">${PLAN.SCENARIOS.map((x) => `<label class="check"><input type="checkbox" data-scn="${x.id}" ${(H.scenarios || []).includes(x.id) ? 'checked' : ''}> ${esc(x.label)}${x.horizon ? ` <span class="muted small">· ${x.horizon} dias</span>` : ''}</label>`).join('')}
+          <label class="check"><input type="checkbox" data-scn="outro" ${(H.scenarios || []).includes('outro') ? 'checked' : ''}> Outro</label>
+        </div>
+        ${(H.scenarios || []).includes('outro') ? lab('Qual cenário?', inp('scenarioOther', H.scenarioOther, 'maxlength="120" placeholder="Descreva a situação"')) : ''}
+      </div>
       <div class="panel"><h2>Pessoas</h2>${H.people.map(personCard).join('')}
         <button type="button" data-add="people">+ Pessoa</button></div>
       <div class="panel"><h2>Animais</h2>${H.pets.map(petCard).join('')}<button type="button" data-add="pets">+ Animal</button></div>
@@ -180,6 +188,13 @@
     if (/(\.birth|\.name)$/.test(p)) rerender();
   });
   $('planForm').addEventListener('change', (e) => {
+    const scn = e.target.dataset.scn;
+    if (scn) {
+      const set = new Set(H.scenarios || []);
+      e.target.checked ? set.add(scn) : set.delete(scn);
+      H.scenarios = [...set]; save(); if (scn === 'outro') rerender(); else renderOutput();
+      return;
+    }
     const p = e.target.dataset.p || '';
     if (/(controlled|species|usesMeds)$/.test(p)) rerender();
   });
@@ -242,7 +257,7 @@
 
   function planText() {
     const out = window.__planOut;
-    const L = [`PLANO DA CASA — ${out.days} dias`, ''];
+    const L = [`PLANO DA CASA — ${out.days} dias`, out.scenarios && out.scenarios.length ? 'Cenários: ' + out.scenarios.join('; ') : '', ''];
     if (out.alerts.length) { L.push('ALERTAS'); out.alerts.forEach((a) => L.push(`- [${a.level}] ${a.text}`)); L.push(''); }
     out.sections.forEach((s) => { L.push(s.title.toUpperCase(), s.lead); s.rows.forEach(([a, b]) => L.push(`- ${a}: ${b}`)); L.push(''); });
     L.push('LISTA DE COMPRAS');

@@ -113,6 +113,51 @@
     return { target, total, notes };
   }
 
+
+  // ---------- cenários ----------
+  // horizon: dias mínimos recomendados; items: [item, quantidade, onde, nota]; acts: ações específicas
+  const SCENARIOS = [
+    { id: 'apagao', label: 'Apagão prolongado', horizon: 3,
+      acts: ['Ao faltar energia, abra a geladeira o mínimo: ela conserva por cerca de 4 h; o freezer cheio, por cerca de 48 h.', 'Em prédio, bomba d\'água e elevador param: encha baldes ao primeiro sinal.', 'Mantenha power banks e a estação de energia carregados (80%).'],
+      items: [['Caixa térmica + gelo reutilizável', '1 caixa + 6 gelos', 'Supermercado ou loja de utilidades', 'Para leite, remédios refrigerados e alimentos.'], ['Carregador veicular USB', '1', 'Loja de eletrônicos', 'O carro vira gerador de recarga.'], ['Ventilador a pilha ou USB', '1 por quarto de criança', 'Loja de eletrônicos', '']] },
+    { id: 'agua', label: 'Falta d\'água ou racionamento', horizon: 14,
+      acts: ['Água potável primeiro para bebês e preparo de alimentos.', 'Reaproveite a água do banho para o vaso sanitário.', 'Ao anúncio de rodízio, encha a caixa e todos os recipientes.'],
+      items: [['Pratos, copos e talheres descartáveis', 'para o período', 'Atacarejo', 'Economizam água de lavagem.'], ['Álcool em gel 70%', '1 L', 'Farmácia ou supermercado', ''], ['Galões extras para higiene', '4 de 20 L', 'Loja de utilidades', '']] },
+    { id: 'chuva', label: 'Chuvas fortes, enchente ou deslizamento', horizon: 3,
+      acts: ['Cadastre o CEP na Defesa Civil (SMS 40199) e saia cedo quando vier o alerta.', 'Nunca atravesse rua alagada, a pé ou de carro. Carro blindado afunda e não tem rota de fuga pela janela.', 'Se a água entrar em casa, desligue o disjuntor geral antes de tocar em qualquer aparelho.'],
+      items: [['Saco estanque para documentos', '1', 'Loja de camping', ''], ['Capa de chuva e botas', '1 por adulto', 'Loja de calçados ou camping', '']] },
+    { id: 'abastecimento', label: 'Greve de caminhoneiros ou desabastecimento', horizon: 14,
+      acts: ['Ao primeiro sinal de paralisação, complete o tanque e o estoque giratório: mercados esvaziam em 3 a 4 dias.', 'Priorize fraldas, fórmula e medicação.'],
+      items: [] },
+    { id: 'epidemia', label: 'Epidemia com isolamento', horizon: 30,
+      acts: ['Medicação de uso contínuo: 60 dias de margem.', 'Defina um cômodo de isolamento para quem adoecer.', 'Tenha o canal de teleconsulta do plano de saúde salvo.'],
+      items: [['Máscaras PFF2', '2 por adulto por semana', 'Farmácia', ''], ['Termômetro digital e oxímetro', '1 de cada', 'Farmácia', ''], ['Álcool em gel 70%', '2 L', 'Farmácia ou supermercado', '']] },
+    { id: 'quimico', label: 'Vazamento químico ou acidente industrial', horizon: 3,
+      acts: ['Abrigo no local: feche portas e janelas, desligue ar-condicionado e vede um cômodo com fita e plástico.', 'Se for ordenada a saída, vá contra o vento e perpendicular à nuvem.', 'Ouça o rádio para orientação oficial.'],
+      items: [['Fita adesiva larga + lona plástica grossa', '2 rolos + 1 lona', 'Loja de material de construção', 'Para vedar um cômodo. Máscara PFF2 não protege contra gases.']] },
+    { id: 'barragem', label: 'Rompimento de barragem', horizon: 3,
+      acts: ['Descubra se o endereço está na Zona de Autossalvamento (até 10 km ou 30 min da onda).', 'Tenha uma rota a pé para área alta que leve menos de 30 minutos.', 'Ao ouvir a sirene ou receber o alerta, saia na hora, sem buscar pertences.'],
+      items: [] },
+    { id: 'incendio', label: 'Incêndio na residência ou no prédio', horizon: 0,
+      acts: ['Rota de saída pela escada, nunca pelo elevador.', 'Combine o ponto de encontro do lado de fora e quem carrega cada criança.', 'Teste o detector de fumaça todo mês.'],
+      items: [['Detector de fumaça extra', '1 por quarto', 'Loja de material elétrico', '']] },
+    { id: 'invasao', label: 'Violência urbana ou invasão domiciliar', horizon: 0,
+      acts: ['Defina o cômodo de refúgio e uma palavra-código da família.', 'Celular carregado e número da polícia (190) acessível no refúgio.', 'Nunca reaja para proteger bens.'],
+      items: [['Alarme com monitoramento ou câmera com aviso no celular', '1 sistema', 'Empresa de segurança', '']] },
+    { id: 'disturbio', label: 'Distúrbio civil prolongado (greve policial, saques)', horizon: 14,
+      acts: ['Fique em casa e reduza deslocamentos ao essencial.', 'Use o carro blindado só para emergência médica.', 'Dinheiro em espécie e estoque cobrem o período sem ir ao mercado.'],
+      items: [] },
+    { id: 'conflito', label: 'Conflito armado ou guerra', horizon: 90,
+      acts: ['Passaportes válidos para todos, inclusive os bebês.', 'Plano de mudança para outra cidade ou outro país, com destino e rota definidos.', 'Rádio para informação quando a rede cair.'],
+      items: [['Passaportes (incluindo bebês)', '1 por pessoa', 'Polícia Federal (agendamento online)', 'Prazo de emissão de semanas; faça antes de precisar.'], ['Reserva em moeda forte (dólar ou euro)', 'equivalente a 1 a 2 meses de despesas', 'Casa de câmbio', 'Só faz sentido para saída do país; no dia a dia local, o real em espécie vale mais.']] },
+    { id: 'digital', label: 'Pane digital (bancos, Pix, internet)', horizon: 7,
+      acts: ['Contatos, documentos e senhas de recuperação também em papel.', 'Contas em dois bancos diferentes, com cartão físico de cada.'],
+      items: [['Lista impressa de contatos e documentos', '1 por adulto', 'Em casa', '']] },
+    { id: 'calor', label: 'Onda de calor extremo', horizon: 3,
+      acts: ['Bebês desidratam rápido: atenção a fralda seca, boca seca e choro sem lágrimas.', 'Nunca deixe criança dentro de carro parado.', 'Mantenha os quartos com cortina fechada durante o dia.'],
+      items: [['Soro de reidratação oral', '10 envelopes', 'Farmácia', ''], ['Ventilador extra', '1 por quarto de criança', 'Loja de eletrônicos', '']] },
+  ];
+
   // ---------- plano completo ----------
   function compute(h, today) {
     const days = Math.max(3, +h.horizon || 14);
@@ -322,10 +367,29 @@
     }
     if (people.some((p) => stage(p.mo) === 'lactente' && p.mo < 3)) out.alerts.push({ level: 'alto', text: 'Bebê com menos de 3 meses: febre de 38 °C ou mais é motivo de atendimento imediato. Tenha o pronto-socorro pediátrico definido.' });
 
+    // Cenários selecionados
+    const sel = SCENARIOS.filter((x) => (h.scenarios || []).includes(x.id));
+    const seen = new Set(out.shopping.map((x) => x.item));
+    const rows = [];
+    for (const sc of sel) {
+      sc.acts.forEach((a, i) => rows.push([i === 0 ? sc.label : '', a]));
+      for (const [item, qty, where, note] of sc.items) {
+        if (seen.has(item)) continue; seen.add(item);
+        buy(`Cenário: ${sc.label}`, item, qty, where, note);
+      }
+    }
+    const custom = (h.scenarios || []).includes('outro') && (h.scenarioOther || '').trim();
+    if (custom) rows.push(['Outro: ' + custom, 'Cenário personalizado: o cálculo automático não cobre. Use "Copiar plano" e analise com IA ou especialista.']);
+    if (rows.length) out.sections.unshift({ title: 'Cenários simulados', lead: `${sel.length + (custom ? 1 : 0)} cenário(s) selecionado(s). Ações específicas de cada um:`, rows });
+    const need = sel.reduce((m, x) => Math.max(m, x.horizon), 0);
+    if (need > days) out.alerts.unshift({ level: 'moderado', text: `Os cenários escolhidos pedem pelo menos ${need} dias de estoque; o horizonte atual é de ${days}. Ajuste em "Horizonte do estoque".` });
+    if (!sel.length && !custom) out.alerts.push({ level: 'info', text: 'Nenhum cenário selecionado: o plano cobre só a base comum a todos.' });
+    out.scenarios = sel.map((x) => x.label).concat(custom ? ['Outro: ' + custom] : []);
+
     return out;
   }
 
-  const api = { PET_SPECIES, compute, ageMonths, stage, fmtAge, waterPerDay, kcalPerDay, diapersPerDay, diaperSize, petFood, cash, FOOD };
+  const api = { SCENARIOS, PET_SPECIES, compute, ageMonths, stage, fmtAge, waterPerDay, kcalPerDay, diapersPerDay, diaperSize, petFood, cash, FOOD };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PLAN = api;
 })(typeof self !== 'undefined' ? self : this);
