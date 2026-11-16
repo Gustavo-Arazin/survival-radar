@@ -297,6 +297,25 @@
     });
   }
 
+  // Tabela com mesclagem: linhas cuja 1ª coluna vem vazia pertencem ao grupo de cima
+  // (como "mesclar e centralizar" do Excel). Grupos alternam o tom de fundo.
+  function table(rows) {
+    const html = [];
+    let g = -1;
+    rows.forEach(([a, b], i) => {
+      if (a !== '' || i === 0) {
+        g++;
+        let span = 1;
+        while (i + span < rows.length && rows[i + span][0] === '') span++;
+        const head = span > 1 ? `<td class="merged" rowspan="${span}">${esc(nw(a))}</td>` : `<td>${esc(nw(a))}</td>`;
+        html.push(`<tr class="g${g % 2}${span > 1 ? ' gstart' : ''}">${head}<td>${esc(nw(b))}</td></tr>`);
+      } else {
+        html.push(`<tr class="g${g % 2} gcont"><td>${esc(nw(b))}</td></tr>`);
+      }
+    });
+    return `<table class="tbl"><tbody>${html.join('')}</tbody></table>`;
+  }
+
   // ---------- resultado ----------
   function renderOutput() {
     const out = PLAN.compute(H);
@@ -304,7 +323,7 @@
       ? out.alerts.map((a) => `<li class="lv-${a.level}"><span class="tag">${a.level}</span><div>${esc(nw(a.text))}</div></li>`).join('')
       : '<li class="lv-baixo"><span class="tag">ok</span><div>Nenhum alerta crítico com os dados informados.</div></li>';
     $('planSections').innerHTML = out.sections.map((s) => `<div class="panel"><h2>${esc(s.title)}</h2><p>${esc(nw(s.lead))}</p>
-      <table class="tbl"><tbody>${s.rows.map(([a, b]) => `<tr><td>${esc(nw(a))}</td><td>${esc(nw(b))}</td></tr>`).join('')}</tbody></table></div>`).join('');
+      ${table(s.rows)}</div>`).join('');
     const groups = {};
     out.shopping.forEach((x) => (groups[x.cat] = groups[x.cat] || []).push(x));
     $('planShopping').innerHTML = Object.entries(groups).map(([cat, list]) => `<h3>${esc(cat)}</h3><ul class="shop">${list.map((x) => {
