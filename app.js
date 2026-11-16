@@ -224,6 +224,7 @@
     current.evaluation = SR.evaluate(current);
     current.actions = SR.recommend(current, current.evaluation);
     render(current);
+    window.dispatchEvent(new CustomEvent('sr-analyzed', { detail: current }));
   }
 
   // Ponto analisado: círculo de raio em linha fina e rótulo no estilo HUD.

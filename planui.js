@@ -14,6 +14,8 @@
     people: [{ name: 'Adulto 1', sex: '', birth: '' }, { name: 'Adulto 2', sex: '', birth: '' }],
     pets: [],
     hasVehicle: false, vehicles: [],
+    alertLevel: 'verde', comms: { bridgeName: '', bridgePhone: '', bridgeCity: '', meetLocal: '', meetFar: '', destination: '', pickup: '', contacts: [] },
+    roles: {}, reviews: {}, checks: {}, inventory: [],
     properties: [newProperty('Residência principal')],
     money: { monthly: '' },
   };
@@ -139,6 +141,11 @@
     const b = `properties.${i}`, u = r.utilities || (r.utilities = {});
     const paysHousing = ['alugado', 'financiado'].includes(r.tenure);
     return `<div class="card"><div class="cardhead"><b>${esc(r.name || 'Imóvel ' + (i + 1))}</b>${(() => { const u = (PLAN.USE.find((x) => x[0] === (r.use || 'principal')) || [0, ''])[1]; return u && u !== r.name ? `<span class="muted small">${esc(u)}</span>` : ''; })()}</div>
+      <div class="addr">
+        ${lab('Endereço (fica só neste aparelho)', inp(`${b}.address`, r.address, 'maxlength="140" placeholder="Rua, número, cidade"'))}
+        <button type="button" data-analyze="${i}">Analisar endereço</button>
+      </div>
+      ${r.analysis ? `<p class="small muted">Análise de ${esc(r.analysis.date)}: exposição <b class="lv-txt-${r.analysis.overall}">${esc(r.analysis.overall)}</b> · ${r.analysis.findings.filter((f) => f.level === 'alto' || f.level === 'moderado').map((f) => esc(f.title)).join(' · ') || 'sem riscos relevantes'}</p>` : ''}
       <div class="grid3">
         ${lab('Nome', inp(`${b}.name`, r.name, 'maxlength="30" placeholder="Ex.: Casa, Sítio"'))}
         ${lab('Tipo', sel(`${b}.type`, r.type, PLAN.PROP_TYPES))}
@@ -190,6 +197,10 @@
         </div>
         ${(H.scenarios || []).includes('outro') ? lab('Qual cenário?', inp('scenarioOther', H.scenarioOther, 'maxlength="120" placeholder="Descreva a situação"')) : ''}
       </div>
+      <div class="panel"><h2>Nível de alerta atual</h2>
+        <p class="muted small">Mude o nível quando um gatilho acontecer. As ações do nível aparecem no topo do resultado.</p>
+        <div class="lvl-grid">${[['verde', 'Verde', 'Normalidade'], ['amarelo', 'Amarelo', 'Atenção'], ['laranja', 'Laranja', 'Preparação'], ['vermelho', 'Vermelho', 'Ação']].map(([id, name, sub]) => `<label class="lvl lvl-${id}${H.alertLevel === id ? ' on' : ''}"><input type="radio" name="lvl" data-level="${id}" ${H.alertLevel === id ? 'checked' : ''}><b>${name}</b><span>${sub}</span></label>`).join('')}</div>
+      </div>
       <div class="panel"><h2>Pessoas</h2>${H.people.map(personCard).join('')}
         <button type="button" data-add="people">+ Pessoa</button></div>
       <div class="panel"><h2>Animais</h2>${H.pets.map(petCard).join('')}<button type="button" data-add="pets">+ Animal</button></div>
@@ -202,6 +213,29 @@
         <div class="row wrap"><label class="inline">Quantidade de imóveis <input type="number" min="1" max="10" data-count="properties" value="${H.properties.length || 1}"></label></div>
         ${H.properties.map(propertyCard).join('')}
         <p class="muted small">A planta fica só neste aparelho. O estoque e a segurança são calculados para a residência principal.</p>
+      </div>
+      <div class="panel"><h2>Comunicação e reencontro</h2>
+        <div class="grid3">
+          ${lab('Contato-ponte (parente fora da cidade)', inp('comms.bridgeName', H.comms.bridgeName, 'maxlength="40"'))}
+          ${lab('Telefone do contato-ponte', inp('comms.bridgePhone', H.comms.bridgePhone, 'type="tel" maxlength="20"'))}
+          ${lab('Cidade do contato-ponte', inp('comms.bridgeCity', H.comms.bridgeCity, 'maxlength="40"'))}
+          ${lab('Ponto de reencontro no bairro', inp('comms.meetLocal', H.comms.meetLocal, 'maxlength="80"'))}
+          ${lab('Ponto de reencontro fora do bairro', inp('comms.meetFar', H.comms.meetFar, 'maxlength="80"'))}
+          ${lab('Destino de saída (casa de parente, sítio…)', inp('comms.destination', H.comms.destination, 'maxlength="80"'))}
+          ${lab('Quem pode buscar as crianças na creche ou escola', inp('comms.pickup', H.comms.pickup, 'maxlength="80"'))}
+        </div>
+        <h3>Contatos de emergência</h3>
+        ${(H.comms.contacts || []).map((c, j) => `<div class="grid3 contact">${lab('Nome', inp(`comms.contacts.${j}.name`, c.name, 'maxlength="40"'))}${lab('Relação', inp(`comms.contacts.${j}.rel`, c.rel, 'maxlength="30" placeholder="Vizinho, pediatra…"'))}${lab('Telefone', inp(`comms.contacts.${j}.phone`, c.phone, 'type="tel" maxlength="20"'))}<button type="button" class="del" data-delcontact="${j}" aria-label="Remover contato">×</button></div>`).join('')}
+        <button type="button" data-addcontact="1">+ Contato</button>
+      </div>
+      <div class="panel"><h2>Papéis da família</h2>
+        <p class="muted small">Quem faz cada tarefa numa emergência.</p>
+        <div class="grid3">${PLANX.ROLES.map(([id, label]) => lab(label, sel(`roles.${id}`, (H.roles || {})[id] || '', [['', '—']].concat(H.people.filter((p) => p.name).map((p) => [p.name, p.name]))))).join('')}</div>
+      </div>
+      <div class="panel"><h2>Estoque atual</h2>
+        <p class="muted small">Registre o que já tem e a validade. O app avisa o que vence primeiro.</p>
+        ${(H.inventory || []).map((x, j) => `<div class="grid3 inv">${lab('Item', inp(`inventory.${j}.name`, x.name, 'maxlength="40"'))}${lab('Quantidade', inp(`inventory.${j}.qty`, x.qty, 'type="number" min="0" step="0.1"'))}${lab('Unidade', inp(`inventory.${j}.unit`, x.unit, 'maxlength="15" placeholder="kg, un, L"'))}${lab('Validade', inp(`inventory.${j}.expiry`, x.expiry, 'type="date"'))}${lab('Onde está guardado', inp(`inventory.${j}.location`, x.location, 'maxlength="40"'))}<button type="button" class="del" data-delinv="${j}" aria-label="Remover item">×</button></div>`).join('')}
+        <button type="button" data-addinv="1">+ Item</button>
       </div>
       <div class="panel"><h2>Dinheiro</h2>
         ${lab('Gasto mensal essencial da família (mercado, farmácia, transporte), em R$', inp('money.monthly', H.money.monthly, 'type="number" min="0" step="100"'))}
@@ -239,6 +273,11 @@
     if (/(\.birth|\.name)$/.test(p)) rerender();
   });
   $('planForm').addEventListener('change', (e) => {
+    if (e.target.dataset.level) {
+      H.alertLevel = e.target.dataset.level; save();
+      document.querySelectorAll('.lvl').forEach((l) => l.classList.toggle('on', l.querySelector('input').checked));
+      renderOutput(); return;
+    }
     const scn = e.target.dataset.scn;
     if (scn) {
       const set = new Set(H.scenarios || []);
@@ -262,6 +301,12 @@
   });
   function rerender() { const y = scrollY; const a = document.activeElement && document.activeElement.dataset.p; renderForm(); renderOutput(); scrollTo(0, y); if (a) { const el = document.querySelector(`[data-p="${a}"]`); if (el && el.type !== 'date') el.focus(); } }
   $('planForm').addEventListener('click', (e) => {
+    const d = e.target.dataset;
+    if (d.analyze != null) { analyzeProperty(+d.analyze); return; }
+    if (d.addcontact) { (H.comms.contacts = H.comms.contacts || []).push({ name: '', rel: '', phone: '' }); save(); rerender(); return; }
+    if (d.delcontact != null) { H.comms.contacts.splice(+d.delcontact, 1); save(); rerender(); return; }
+    if (d.addinv) { (H.inventory = H.inventory || []).push({ name: '', qty: '', unit: '', expiry: '', location: '' }); save(); rerender(); return; }
+    if (d.delinv != null) { H.inventory.splice(+d.delinv, 1); save(); rerender(); return; }
     const add = e.target.dataset.add, del = e.target.dataset.del, addmed = e.target.dataset.addmed, delmed = e.target.dataset.delmed;
     if (addmed) { const [k, i] = addmed.split('.'); (H[k][+i].meds = H[k][+i].meds || []).push({ name: '', perDay: 1, stock: '', unit: k === 'pets' ? 'doses' : 'comprimidos', controlled: false }); }
     else if (delmed) { const [k, i, j] = delmed.split('.'); H[k][+i].meds.splice(+j, 1); }
@@ -269,6 +314,29 @@
     else if (del) { const [k, i] = del.split('.'); H[k].splice(+i, 1); }
     else return;
     save(); const y = scrollY; renderForm(); renderOutput(); scrollTo(0, y);
+  });
+
+  // ---------- analisar endereço de um imóvel (usa a aba Local) ----------
+  let pendingProp = null;
+  function analyzeProperty(i) {
+    const p = H.properties[i];
+    if (!p.address) { alertMsg('Preencha o endereço do imóvel antes de analisar.'); return; }
+    pendingProp = i;
+    document.querySelector('[data-tab="local"]').click();
+    $('placeName').value = p.name || `Imóvel ${i + 1}`;
+    $('q').value = p.address;
+    $('searchForm').requestSubmit();
+  }
+  function alertMsg(t) { const m = $('planMsg'); if (m) { m.textContent = t; m.scrollIntoView({ block: 'center' }); } }
+  window.addEventListener('sr-analyzed', (e) => {
+    if (pendingProp == null || !H.properties[pendingProp]) return;
+    const m = e.detail;
+    H.properties[pendingProp].analysis = {
+      date: new Date().toLocaleDateString('pt-BR'), overall: m.evaluation.overall, lat: m.lat, lon: m.lon,
+      findings: m.evaluation.findings.map((f) => ({ level: f.level, title: f.title })),
+    };
+    pendingProp = null;
+    save(); renderForm(); renderOutput();
   });
 
   // ---------- planta (IndexedDB) ----------
@@ -317,23 +385,60 @@
   }
 
   // ---------- resultado ----------
+  const LV = { alto: 3, moderado: 2, baixo: 1, info: 0 };
+  const PRI = { 1: 'Prioridade 1 — comprar já', 2: 'Prioridade 2 — este mês', 3: 'Prioridade 3 — quando possível' };
+  const section = (s) => `<div class="panel"><h2>${esc(s.title)}</h2><p>${esc(nw(s.lead))}</p>${table(s.rows)}</div>`;
+
   function renderOutput() {
     const out = PLAN.compute(H);
+    const x = PLANX.extend(H, out);
+    out.alerts.sort((a, b) => LV[b.level] - LV[a.level]);
+    // nível atual
+    $('planLevel').className = 'panel lvl-banner lvl-' + x.current.level;
+    $('planLevel').innerHTML = `<p class="eyebrow">Nível de alerta atual</p><h2>${esc(x.current.label)}</h2><ol>${x.current.actions.map((a) => `<li>${esc(nw(a))}</li>`).join('')}</ol>`;
     $('planAlerts').innerHTML = out.alerts.length
       ? out.alerts.map((a) => `<li class="lv-${a.level}"><span class="tag">${a.level}</span><div>${esc(nw(a.text))}</div></li>`).join('')
       : '<li class="lv-baixo"><span class="tag">ok</span><div>Nenhum alerta crítico com os dados informados.</div></li>';
-    $('planSections').innerHTML = out.sections.map((s) => `<div class="panel"><h2>${esc(s.title)}</h2><p>${esc(nw(s.lead))}</p>
-      ${table(s.rows)}</div>`).join('');
+    const byTitle = (t) => out.sections.find((z) => z.title === t);
+    const first = ['Cenários simulados'].map(byTitle).filter(Boolean);
+    const rest = out.sections.filter((z) => !first.includes(z));
+    const xs = Object.fromEntries(x.sections.map((z) => [z.title, z]));
+    const ordered = [...first, x.timeline, xs['Níveis de alerta'], ...rest, xs['Comunicação e reencontro'], xs['Bolsa de saída'], xs['Papéis da família']].filter(Boolean);
+    let html = ordered.map(section).join('');
+    // checklist
     const groups = {};
-    out.shopping.forEach((x) => (groups[x.cat] = groups[x.cat] || []).push(x));
-    $('planShopping').innerHTML = Object.entries(groups).map(([cat, list]) => `<h3>${esc(cat)}</h3><ul class="shop">${list.map((x) => {
-      const id = cat + '|' + x.item;
-      return `<li><label class="check"><input type="checkbox" data-buy="${esc(id)}" ${bought[id] ? 'checked' : ''}><span><b>${esc(nw(x.item))}</b> · ${esc(x.qty)}<br><span class="muted small">${esc(nw(x.where + (x.note ? ' · ' + x.note : '')))}</span></span></label></li>`;
-    }).join('')}</ul>`).join('');
-    const total = out.shopping.length, done = out.shopping.filter((x) => bought[x.cat + '|' + x.item]).length;
-    $('planProgress').textContent = `${done} de ${total} itens prontos`;
-    window.__planOut = out;
+    x.checklist.forEach((c) => (groups[c.group] = groups[c.group] || []).push(c));
+    const doneN = x.checklist.filter((c) => (H.checks || {})[c.id]).length;
+    html += `<div class="panel"><h2>Checklist de preparação</h2><p>${doneN} de ${x.checklist.length} concluídos.</p>${Object.entries(groups).map(([g, list]) => `<h3>${esc(g)}</h3><ul class="shop">${list.map((c) => `<li><label class="check"><input type="checkbox" data-check="${c.id}" ${(H.checks || {})[c.id] ? 'checked' : ''}><span>${esc(nw(c.text))}</span></label></li>`).join('')}</ul>`).join('')}</div>`;
+    // revisões
+    html += `<div class="panel"><h2>Rotina de revisão</h2><p>${esc(nw('Um plano com crianças pequenas vence em semanas. Marque cada revisão quando fizer.'))}</p><ul class="shop">${x.reviews.map((r) => `<li class="rev${r.late ? ' late' : ''}"><div><b>${esc(nw(r.text))}</b><br><span class="muted small">${r.last ? 'Última: ' + PLANX.fmtDate(r.last) + ' · ' : ''}${esc(r.status)}</span></div>${r.id ? `<button type="button" data-review="${r.id}">Feito hoje</button>` : ''}</li>`).join('')}</ul></div>`;
+    // estoque
+    if (x.inventory.length) html += `<div class="panel"><h2>Estoque atual</h2><p>${esc(nw('Ordenado pela validade: consuma de cima para baixo e reponha.'))}</p><table class="tbl"><tbody>${x.inventory.map((i) => `<tr class="${i.days != null && i.days < 0 ? 'inv-bad' : i.days != null && i.days <= 30 ? 'inv-warn' : ''}"><td>${esc(nw(i.name))}${i.location ? `<br><span class="small">${esc(i.location)}</span>` : ''}</td><td>${esc(i.qty || '')} ${esc(i.unit || '')}</td><td>${esc(i.status)}</td></tr>`).join('')}</tbody></table></div>`;
+    $('planSections').innerHTML = html;
+
+    // compras por prioridade, com custo estimado
+    const t = x.totals;
+    $('planShopping').innerHTML = `<div class="totals">${[1, 2, 3].map((p) => `<div><span class="eyebrow">${PRI[p].split(' — ')[0]}</span><b>${t.brl(t.byPri[p - 1])}</b><span class="small muted">${PRI[p].split(' — ')[1]}</span></div>`).join('')}<div><span class="eyebrow">Total estimado</span><b>${t.brl(t.all)}</b><span class="small muted">preços aproximados</span></div></div>` +
+      [1, 2, 3].map((p) => {
+        const list = out.shopping.filter((z) => z.pri === p);
+        if (!list.length) return '';
+        return `<h3>${esc(PRI[p])}</h3><ul class="shop">${list.map((z) => {
+          const id = z.cat + '|' + z.item;
+          return `<li><label class="check"><input type="checkbox" data-buy="${esc(id)}" ${bought[id] ? 'checked' : ''}><span><b>${esc(nw(z.item))}</b> · ${esc(z.qty)}${z.cost ? ` · <span class="cost">≈&nbsp;${t.brl(z.cost)}</span>` : ''}<br><span class="muted small"><span class="cat-tag">${esc(z.cat)}</span> ${esc(nw(z.where + (z.note ? ' · ' + z.note : '')))}</span></span></label></li>`;
+        }).join('')}</ul>`;
+      }).join('');
+    const total = out.shopping.length, done = out.shopping.filter((z) => bought[z.cat + '|' + z.item]).length;
+    $('planProgress').textContent = `${done} de ${total} itens prontos. Custos são estimativas aproximadas e servem para priorizar, não para orçar.`;
+    window.__planOut = out; window.__planX = x;
   }
+  $('planSections').addEventListener('change', (e) => {
+    const id = e.target.dataset.check; if (!id) return;
+    H.checks = H.checks || {}; H.checks[id] = e.target.checked; save(); renderOutput();
+  });
+  $('planSections').addEventListener('click', (e) => {
+    const id = e.target.dataset.review; if (!id) return;
+    H.reviews = H.reviews || {}; H.reviews[id] = PLANX.iso(new Date()); save(); renderOutput();
+  });
   $('planShopping').addEventListener('change', (e) => {
     const id = e.target.dataset.buy; if (!id) return;
     bought[id] = e.target.checked;
@@ -345,24 +450,55 @@
     const out = window.__planOut;
     const L = [`PLANO DA CASA — ${out.days} dias`, out.scenarios && out.scenarios.length ? 'Cenários: ' + out.scenarios.join('; ') : '', ''];
     if (out.alerts.length) { L.push('ALERTAS'); out.alerts.forEach((a) => L.push(`- [${a.level}] ${a.text}`)); L.push(''); }
-    out.sections.forEach((s) => { L.push(s.title.toUpperCase(), s.lead); s.rows.forEach(([a, b]) => L.push(`- ${a}: ${b}`)); L.push(''); });
+    const x = window.__planX;
+    L.unshift(`NÍVEL ATUAL: ${x.current.label}`, ...x.current.actions.map((a) => '- ' + a), '');
+    [...out.sections, ...(x.timeline ? [x.timeline] : []), ...x.sections].forEach((s) => { L.push(s.title.toUpperCase(), s.lead); let g = ''; s.rows.forEach(([a, b]) => { if (a) g = a; L.push(`- ${a || g}: ${b}`); }); L.push(''); });
+    L.push('CHECKLIST'); x.checklist.forEach((c) => L.push(`[${(H.checks || {})[c.id] ? 'x' : ' '}] ${c.text}`)); L.push('');
     L.push('LISTA DE COMPRAS');
-    out.shopping.forEach((x) => L.push(`[${bought[x.cat + '|' + x.item] ? 'x' : ' '}] ${x.item} — ${x.qty} (${x.where})`));
+    out.shopping.slice().sort((a, b) => a.pri - b.pri).forEach((z) => L.push(`[${bought[z.cat + '|' + z.item] ? 'x' : ' '}] P${z.pri} ${z.item} — ${z.qty} (${z.where})`));
     return L.join('\n');
   }
   const msg = (t) => { $('planMsg').textContent = t; };
   $('planCopy').onclick = async () => { try { await navigator.clipboard.writeText(planText()); msg('Plano copiado.'); } catch { msg('Não foi possível copiar.'); } };
   $('planPrint').onclick = () => { document.body.classList.add('print-plan'); window.print(); setTimeout(() => document.body.classList.remove('print-plan'), 500); };
-  $('planExport').onclick = () => {
-    const blob = new Blob([JSON.stringify({ v: 1, house: H, bought }, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'survival-radar-backup.json';
+  // Backup: com senha, o arquivo é cifrado (AES-GCM, chave derivada por PBKDF2).
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  async function keyFrom(pass, salt) {
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+  $('planExport').onclick = async () => {
+    const plain = JSON.stringify({ v: 1, house: H, bought });
+    const pass = $('planPass').value;
+    let body = plain, name = 'survival-radar-backup.json';
+    if (pass) {
+      const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+      const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await keyFrom(pass, salt), new TextEncoder().encode(plain));
+      body = JSON.stringify({ v: 2, enc: 'AES-GCM/PBKDF2-SHA256-250k', salt: b64(salt), iv: b64(iv), data: b64(data) });
+      name = 'survival-radar-backup-cifrado.json';
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: 'application/json' })); a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
-    msg('Backup baixado. Guarde com cuidado: contém dados sensíveis da família.');
+    msg(pass ? 'Backup cifrado baixado. Sem a senha, ninguém abre, nem você.' : 'Backup baixado SEM senha: contém dados sensíveis. Prefira preencher a senha.');
   };
   $('planImport').onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    try { const j = JSON.parse(await f.text()); H = Object.assign(structuredClone(DEFAULT), migrateRaw(j.house) || {}); bought = j.bought || {}; save(); try { localStorage.setItem(BOUGHT, JSON.stringify(bought)); } catch {} renderForm(); renderOutput(); msg('Backup restaurado.'); }
-    catch { msg('Arquivo inválido.'); }
+    try {
+      let j = JSON.parse(await f.text());
+      if (j.enc) {
+        const pass = $('planPass').value;
+        if (!pass) { msg('Backup cifrado: digite a senha no campo e selecione o arquivo de novo.'); e.target.value = ''; return; }
+        try {
+          const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(j.iv) }, await keyFrom(pass, unb64(j.salt)), unb64(j.data));
+          j = JSON.parse(new TextDecoder().decode(data));
+        } catch { msg('Senha incorreta.'); e.target.value = ''; return; }
+      }
+      H = Object.assign(structuredClone(DEFAULT), migrateRaw(j.house) || {}); bought = j.bought || {};
+      save(); try { localStorage.setItem(BOUGHT, JSON.stringify(bought)); } catch {}
+      renderForm(); renderOutput(); msg('Backup restaurado.');
+    } catch { msg('Arquivo inválido.'); }
+    e.target.value = '';
   };
 
   // ---------- abas ----------

@@ -148,11 +148,13 @@
       <button id="planExport" type="button">Baixar backup</button>
       <label class="filebtn">Restaurar backup<input id="planImport" type="file" accept="application/json" hidden></label>
     </div>
+    <label class="inline passrow">Senha do backup <input id="planPass" type="password" autocomplete="new-password" placeholder="opcional, recomendada"></label>
     <p id="planMsg" class="muted small" aria-live="polite"></p>
   </section>
   <h2 class="formtitle">1. Dados da família e da casa</h2>
   <div id="planForm"></div>
   <h2 class="formtitle">2. Resultado</h2>
+  <section class="panel" id="planLevel"></section>
   <section class="panel">
     <h2>Alertas</h2>
     <ul id="planAlerts" class="risks"></ul>
@@ -169,6 +171,7 @@
 
 <script src="rules.js"></script>
 <script src="plan.js"></script>
+<script src="planx.js"></script>
 <script src="planui.js"></script>
 <script src="app.js"></script>
 </body>

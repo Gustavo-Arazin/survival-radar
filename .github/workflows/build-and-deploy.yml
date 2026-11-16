@@ -29,7 +29,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
 
       - name: Testar regras
-        run: node test/rules.test.js && node test/plan.test.js
+        run: node test/rules.test.js && node test/plan.test.js && node test/planx.test.js
 
       - name: Reaproveitar base publicada (só em mudanças de código)
         id: reuse
@@ -78,9 +78,9 @@ jobs:
       - name: Montar site
         run: |
           mkdir -p dist
-          cp -r index.html styles.css app.js rules.js plan.js planui.js sw.js manifest.webmanifest icon.svg fonts .nojekyll dist/
+          cp -r index.html styles.css app.js rules.js plan.js planx.js planui.js sw.js manifest.webmanifest icon.svg fonts .nojekyll dist/
           V=${GITHUB_SHA::7}
-          sed -i -E "s#(src|href)=\"(styles\.css|app\.js|rules\.js|plan\.js|planui\.js)\"#\1=\"\2?v=$V\"#g" dist/index.html
+          sed -i -E "s#(src|href)=\"(styles\.css|app\.js|rules\.js|plan\.js|planx\.js|planui\.js)\"#\1=\"\2?v=$V\"#g" dist/index.html
           sed -i "s#const SHELL = 'sr-shell-v1'#const SHELL = 'sr-shell-$V'#" dist/sw.js
           grep -o '?v=[a-f0-9]*' dist/index.html | head -3
           du -sh dist/data
