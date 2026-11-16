@@ -202,16 +202,21 @@
     // Medicação
     const medRows = [];
     const target = Math.max(days, 30);
-    for (const m of h.meds || []) {
-      if (!m.name) continue;
-      const perDay = Math.max(0.01, +m.perDay || 1);
-      const have = +m.stock || 0;
-      const lasts = Math.floor(have / perDay);
-      const need = Math.max(0, ceil(target * perDay - have));
-      medRows.push([`${m.name}${m.controlled ? ' (controlado)' : ''}${m.who ? ' · ' + m.who : ''}`, `dura ${lasts} dias${need ? ` · faltam ${need} ${m.unit || 'unidades'} para ${target} dias` : ' · ok'}`]);
-      if (need) {
-        if (m.controlled) out.alerts.push({ level: 'alto', text: `${m.name}: estoque para ${lasts} dias. Medicamento controlado só se compra com receita retida; peça ao médico uma receita que cubra a margem de ${target} dias.` });
-        else buy('Medicação', m.name, `${need} ${m.unit || 'unidades'}`, 'Farmácia', 'Mantenha 30 dias de margem.');
+    const medOwners = [
+      ...people.map((p) => ({ owner: p.name || 'Pessoa', list: p.usesMeds ? p.meds || [] : [], vet: false })),
+      ...(h.pets || []).map((pet) => ({ owner: petName(pet), list: pet.usesMeds ? pet.meds || [] : [], vet: true })),
+    ];
+    for (const { owner, list, vet } of medOwners) {
+      for (const m of list) {
+        if (!m.name) continue;
+        const perDay = Math.max(0.01, +m.perDay || 1);
+        const have = +m.stock || 0;
+        const lasts = Math.floor(have / perDay);
+        const need = Math.max(0, ceil(target * perDay - have));
+        medRows.push([`${owner}: ${m.name}${m.controlled ? ' (controlado)' : ''}`, `dura ${lasts} dias${need ? ` · faltam ${need} ${m.unit || 'unidades'} para ${target} dias` : ' · ok'}`]);
+        if (!need) continue;
+        if (m.controlled) out.alerts.push({ level: 'alto', text: `${owner} — ${m.name}: estoque para ${lasts} dias. Controlado só se compra com receita ${vet ? 'veterinária ' : ''}retida; peça ${vet ? 'ao veterinário' : 'ao médico'} uma receita que cubra a margem de ${target} dias.` });
+        else buy('Medicação', `${m.name} (${owner})`, `${need} ${m.unit || 'unidades'}`, vet ? 'Pet shop ou clínica veterinária' : 'Farmácia', 'Mantenha 30 dias de margem.');
       }
     }
     if (medRows.length) out.sections.push({ title: 'Medicação', lead: `Meta: ${target} dias de margem. Guarde cópia das receitas junto com os documentos.`, rows: medRows });
@@ -220,7 +225,7 @@
     const med = people.map((p) => [p.name || 'Pessoa', [
       `idade: ${fmtAge(p.mo)}`, p.blood ? `sangue: ${p.blood}` : 'sangue: não informado',
       p.weight ? `peso: ${p.weight} kg` : '', p.conditions ? `condições/alergias: ${p.conditions}` : '',
-      (h.meds || []).filter((m) => m.name && m.who === p.name).map((m) => m.name + (m.controlled ? ' (controlado)' : '')).join(', ') ? 'medicação: ' + (h.meds || []).filter((m) => m.name && m.who === p.name).map((m) => m.name).join(', ') : '',
+      p.usesMeds && (p.meds || []).some((m) => m.name) ? 'medicação: ' + p.meds.filter((m) => m.name).map((m) => m.name + (m.controlled ? ' (controlado)' : '')).join(', ') : '',
     ].filter(Boolean).join(' · ')]);
     if (med.length) out.sections.push({ title: 'Ficha de emergência da família', lead: 'Imprima e deixe na bolsa de saída e na carteira de cada adulto. É o que o socorrista precisa saber.', rows: med });
     if (people.some((p) => !p.blood)) out.alerts.push({ level: 'moderado', text: 'Tipo sanguíneo não informado para todos: confira na carteira de doador, no exame de pré-natal ou no teste do pezinho.' });

@@ -93,3 +93,5 @@ ol li { margin: 4px 0; }
   .tbl td { border-top: 1px solid #ccc; }
   .shop li { background: #fff; border: 1px solid #ddd; }
 }
+.meds { margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--line); }
+.subcard { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 8px; background: #0f1218; }

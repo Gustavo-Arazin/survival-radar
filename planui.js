@@ -10,13 +10,23 @@
   const DEFAULT = {
     horizon: 14,
     people: [{ name: 'Adulto 1', sex: '', birth: '' }, { name: 'Adulto 2', sex: '', birth: '' }],
-    meds: [], pets: [],
+    pets: [],
     vehicle: { has: false, armored: false, tank: '', kmPerL: '' },
     residence: { type: 'apto', floor: '', area: '', bedrooms: 2, waterTank: '', gas: 'encanado', elevator: false, concierge: false, lock: 'comum', door: 'macica', solar: false, utilities: { gas: '', water: '', power: '' }, exit1: '', exit2: '', meet: '', refuge: '' },
     money: { monthly: '' },
   };
   const load = () => { try { return Object.assign(structuredClone(DEFAULT), JSON.parse(localStorage.getItem(KEY)) || {}); } catch { return structuredClone(DEFAULT); } };
   let H = load();
+  (function migrate() {
+    if (Array.isArray(H.meds) && H.meds.length) {
+      for (const m of H.meds) {
+        const p = H.people.find((x) => x.name && x.name === m.who) || H.people[0];
+        if (!p) continue;
+        p.usesMeds = true; (p.meds = p.meds || []).push({ name: m.name, perDay: m.perDay, stock: m.stock, unit: m.unit, controlled: m.controlled });
+      }
+    }
+    delete H.meds;
+  })();
   let bought = (() => { try { return JSON.parse(localStorage.getItem(BOUGHT)) || {}; } catch { return {}; } })();
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(H)); } catch {} window.dispatchEvent(new CustomEvent('sr-house-changed')); };
 
@@ -29,7 +39,7 @@
       infants: ps.filter((p) => ['lactente', 'bebe'].includes(st(p))).length,
       kids: ps.filter((p) => st(p) === 'crianca').length,
       elderly: ps.filter((p) => st(p) === 'idoso').length,
-      mobility: ps.some((p) => p.mobility), meds: H.meds.some((m) => m.name),
+      mobility: ps.some((p) => p.mobility), meds: ps.some((p) => p.usesMeds && (p.meds || []).some((m) => m.name)),
       car: !!H.vehicle.has, pets: H.pets.length > 0, armored: !!H.vehicle.armored,
     };
   };
@@ -57,21 +67,25 @@
         ${chk(`people.${i}.mobility`, p.mobility, 'Mobilidade reduzida')}
       </div>
       ${lab('Condições de saúde ou alergias (fica só neste aparelho)', inp(`people.${i}.conditions`, p.conditions, 'maxlength="160"'))}
+      ${medsBlock(`people.${i}`, p)}
     </div>`;
   }
 
-  function medCard(m, i) {
-    const who = [['', '—']].concat(H.people.map((p) => [p.name, p.name]));
-    return `<div class="card"><div class="cardhead"><b>${esc(m.name || 'Medicamento')}</b>${m.controlled ? '<span class="tag tag-ctl">controlado</span>' : ''}<button type="button" class="del" data-del="meds.${i}" aria-label="Remover">×</button></div>
+  function medCard(base, m, j) {
+    const p = `${base}.meds.${j}`;
+    return `<div class="subcard"><div class="cardhead"><b>${esc(m.name || 'Medicamento')}</b>${m.controlled ? '<span class="tag tag-ctl">controlado</span>' : ''}<button type="button" class="del" data-delmed="${base}.${j}" aria-label="Remover medicamento">×</button></div>
       <div class="grid3">
-        ${lab('Nome', inp(`meds.${i}.name`, m.name, 'maxlength="40"'))}
-        ${lab('Quem usa', sel(`meds.${i}.who`, m.who || '', who))}
-        ${lab('Doses por dia', inp(`meds.${i}.perDay`, m.perDay, 'type="number" min="0" step="0.5"'))}
-        ${lab('Estoque atual (unidades)', inp(`meds.${i}.stock`, m.stock, 'type="number" min="0"'))}
-        ${lab('Unidade', inp(`meds.${i}.unit`, m.unit, 'placeholder="comprimidos, ml…"'))}
+        ${lab('Nome', inp(`${p}.name`, m.name, 'maxlength="40"'))}
+        ${lab('Doses por dia', inp(`${p}.perDay`, m.perDay, 'type="number" min="0" step="0.5"'))}
+        ${lab('Estoque atual (unidades)', inp(`${p}.stock`, m.stock, 'type="number" min="0"'))}
+        ${lab('Unidade', inp(`${p}.unit`, m.unit, 'placeholder="comprimidos, ml…"'))}
       </div>
-      ${chk(`meds.${i}.controlled`, m.controlled, 'Controlado (receita retida, tarja preta ou vermelha)')}
+      ${chk(`${p}.controlled`, m.controlled, 'Controlado (receita retida)')}
     </div>`;
+  }
+  function medsBlock(base, o) {
+    return `${chk(`${base}.usesMeds`, o.usesMeds, 'Faz uso de medicação contínua')}
+      ${o.usesMeds ? `<div class="meds">${(o.meds || []).map((m, j) => medCard(base, m, j)).join('')}<button type="button" data-addmed="${base}">+ Medicamento</button></div>` : ''}`;
   }
 
   function petCard(p, i) {
@@ -82,7 +96,9 @@
         ${lab('Nome', inp(`pets.${i}.name`, p.name, 'maxlength="20"'))}
         ${lab('Peso (kg)', inp(`pets.${i}.weight`, p.weight, 'type="number" min="0" step="0.1"'))}
         ${lab('Ração por dia (g, se souber)', inp(`pets.${i}.foodPerDay`, p.foodPerDay, 'type="number" min="0"'))}
-      </div></div>`;
+      </div>
+      ${medsBlock(`pets.${i}`, p)}
+    </div>`;
   }
 
   function renderForm() {
@@ -96,9 +112,6 @@
       </div>
       <div class="panel"><h2>Pessoas</h2>${H.people.map(personCard).join('')}
         <button type="button" data-add="people">+ Pessoa</button></div>
-      <div class="panel"><h2>Medicação de uso contínuo</h2>
-        <p class="muted small">Inclua os controlados. Os nomes ficam só neste aparelho e nunca são enviados.</p>
-        ${H.meds.map(medCard).join('')}<button type="button" data-add="meds">+ Medicamento</button></div>
       <div class="panel"><h2>Animais</h2>${H.pets.map(petCard).join('')}<button type="button" data-add="pets">+ Animal</button></div>
       <div class="panel"><h2>Veículo</h2>
         <div class="row wrap">${chk('vehicle.has', v.has, 'Família tem carro')}${chk('vehicle.armored', v.armored, 'Blindado')}</div>
@@ -168,12 +181,14 @@
   });
   $('planForm').addEventListener('change', (e) => {
     const p = e.target.dataset.p || '';
-    if (/(controlled|species)$/.test(p)) rerender();
+    if (/(controlled|species|usesMeds)$/.test(p)) rerender();
   });
   function rerender() { const y = scrollY; const a = document.activeElement && document.activeElement.dataset.p; renderForm(); renderOutput(); scrollTo(0, y); if (a) { const el = document.querySelector(`[data-p="${a}"]`); if (el && el.type !== 'date') el.focus(); } }
   $('planForm').addEventListener('click', (e) => {
-    const add = e.target.dataset.add, del = e.target.dataset.del;
-    if (add) { H[add].push(add === 'people' ? { name: '', sex: '', birth: '' } : add === 'pets' ? { species: 'cao', name: '', weight: '' } : { name: '', perDay: 1, stock: '', unit: 'comprimidos', controlled: false }); }
+    const add = e.target.dataset.add, del = e.target.dataset.del, addmed = e.target.dataset.addmed, delmed = e.target.dataset.delmed;
+    if (addmed) { const [k, i] = addmed.split('.'); (H[k][+i].meds = H[k][+i].meds || []).push({ name: '', perDay: 1, stock: '', unit: k === 'pets' ? 'doses' : 'comprimidos', controlled: false }); }
+    else if (delmed) { const [k, i, j] = delmed.split('.'); H[k][+i].meds.splice(+j, 1); }
+    else if (add) { H[add].push(add === 'people' ? { name: '', sex: '', birth: '' } : { species: 'cao', name: '', weight: '' }); }
     else if (del) { const [k, i] = del.split('.'); H[k].splice(+i, 1); }
     else return;
     save(); const y = scrollY; renderForm(); renderOutput(); scrollTo(0, y);

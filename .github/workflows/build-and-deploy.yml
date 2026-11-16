@@ -31,7 +31,19 @@ jobs:
       - name: Testar regras
         run: node test/rules.test.js && node test/plan.test.js
 
+      - name: Reaproveitar base publicada (só em mudanças de código)
+        id: reuse
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p dist
+          if git fetch --depth=1 origin gh-pages && git cat-file -e origin/gh-pages:data/index.json; then
+            git archive origin/gh-pages data | tar -x -C dist
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "Base reaproveitada: $(du -sh dist/data | cut -f1)"
+          fi
+
       - name: Baixar extração do Brasil (Geofabrik)
+        if: steps.reuse.outputs.ok != 'true'
         run: |
           for url in \
             https://download.geofabrik.de/south-america/brazil-latest.osm.pbf \
@@ -42,6 +54,7 @@ jobs:
           test -s brazil.osm.pbf && ls -lh brazil.osm.pbf
 
       - name: Filtrar objetos de interesse
+        if: steps.reuse.outputs.ok != 'true'
         run: |
           osmium tags-filter brazil.osm.pbf \
             nwr/amenity=hospital,fire_station,police,clinic,pharmacy,fuel \
@@ -59,15 +72,19 @@ jobs:
           ls -lh filtered.osm.pbf filtered.geojsonseq
 
       - name: Gerar blocos estáticos
+        if: steps.reuse.outputs.ok != 'true'
+        run: node pipeline/build-tiles.js filtered.geojsonseq dist/data
+
+      - name: Montar site
         run: |
           mkdir -p dist
           cp index.html styles.css app.js rules.js plan.js planui.js sw.js manifest.webmanifest icon.svg .nojekyll dist/
-          node pipeline/build-tiles.js filtered.geojsonseq dist/data
           V=${GITHUB_SHA::7}
           sed -i -E "s#(src|href)=\"(styles\.css|app\.js|rules\.js|plan\.js|planui\.js)\"#\1=\"\2?v=$V\"#g" dist/index.html
           sed -i "s#const SHELL = 'sr-shell-v1'#const SHELL = 'sr-shell-$V'#" dist/sw.js
           grep -o '?v=[a-f0-9]*' dist/index.html | head -3
           du -sh dist/data
+          test -s dist/data/index.json
 
       - name: Publicar no GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
