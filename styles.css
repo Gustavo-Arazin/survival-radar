@@ -1,3 +1,4 @@
+[hidden] { display: none !important; }
 /* Survival Radar — identidade visual do ΛＲＺＮ OpSys (Brandbook v1.0).
  * Preto é o canvas, cinza cria estrutura, azul cria ação, neon é estado.
  * Montserrat é a única família. Cartões tonais com linha fina, sem sombra nem gradiente. */
@@ -250,3 +251,28 @@ label.inline { display: inline-flex; width: auto; max-width: 100%; }
 #planPass { width: 220px; }
 .badges { display: inline-flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
 .badge { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--accent); }
+/* auditoria 375/1440: sem estouro horizontal */
+.lvl { min-width: 0; overflow: hidden; }
+.lvl span, .lvl b { overflow-wrap: anywhere; }
+.lvl-grid { grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); }
+.grid3 { grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
+.grid3.contact, .grid3.inv { grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)) 40px; }
+.grid3 > * { min-width: 0; }
+@media (max-width: 600px) { .grid3.contact, .grid3.inv { grid-template-columns: 1fr 40px; } }
+main { grid-template-columns: minmax(0, 1fr); }
+main > *, .panel { min-width: 0; }
+.scn-grid { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+.tbl { max-width: 100%; }
+label.inline { white-space: normal; }
+label.inline > input[type=checkbox], label.inline > input[type=radio] { flex: none; }
+.passrow input { min-width: 0; flex: 1 1 140px; }
+.card { min-width: 0; }
+.card .row, .cardhead { flex-wrap: wrap; }
+input[type=file] { max-width: 100%; min-width: 0; font-size: 12.5px; }
+@media (max-width: 600px) {
+  .grid3.contact, .grid3.inv { grid-template-columns: minmax(0, 1fr); }
+  .grid3.contact > .del, .grid3.inv > .del { justify-self: end; }
+}
+.tbl { table-layout: fixed; }
+.tbl td { overflow-wrap: anywhere; }
+#planForm { display: grid; gap: 14px; }

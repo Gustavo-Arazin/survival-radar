@@ -230,7 +230,7 @@
       </div>
       <div class="panel"><h2>Papéis da família</h2>
         <p class="muted small">Quem faz cada tarefa numa emergência.</p>
-        <div class="grid3">${PLANX.ROLES.map(([id, label]) => lab(label, sel(`roles.${id}`, (H.roles || {})[id] || '', [['', '—']].concat(H.people.filter((p) => p.name).map((p) => [p.name, p.name]))))).join('')}</div>
+        <div class="grid3">${PLANX.ROLES.map(([id, label]) => lab(nw(label), sel(`roles.${id}`, (H.roles || {})[id] || '', [['', '—']].concat(H.people.filter((p) => p.name).map((p) => [p.name, p.name]))))).join('')}</div>
       </div>
       <div class="panel"><h2>Estoque atual</h2>
         <p class="muted small">Registre o que já tem e a validade. O app avisa o que vence primeiro.</p>
