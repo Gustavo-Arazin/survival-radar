@@ -249,13 +249,14 @@ way(around:3000,${c})[man_made=pipeline]->.p;
   }
 
   // Setores de risco do SGB: dentro de algum? qual o mais próximo?
+  const trimDot = (t) => String(t || '').trim().replace(/[.\s]+$/, '');
   function geoRiskFrom(rows, origin) {
     let inside = null, nearest = null;
     const seen = new Set();
     for (const r of rows) {
       if (seen.has(r[4])) continue; seen.add(r[4]);
       for (const ring of r[5]) {
-        const sector = { grau: r[0], tipo: r[1], local: r[2], munic: r[3], id: r[4] };
+        const sector = { grau: r[0], tipo: r[1], local: trimDot(r[2]), munic: r[3], id: r[4] };
         if (inRing(origin, ring)) { if (!inside || /muito/i.test(sector.grau)) inside = sector; }
         const d = distToPolyline(origin, ring.map(([a, b]) => ({ lat: a, lon: b })));
         if (!nearest || d < nearest.dist) nearest = { ...sector, dist: d };
