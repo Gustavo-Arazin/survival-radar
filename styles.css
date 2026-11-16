@@ -33,7 +33,7 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.top { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--brand-black); z-index: 1000; }
+.top { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--brand-black); z-index: 3000; }
 .brand { display: flex; gap: 12px; align-items: center; }
 .logo { width: 28px; height: 28px; border: 1px solid var(--brand-structural-gray); border-radius: 50%; position: relative; flex: none; }
 .logo::before { content: ""; position: absolute; inset: 7px; border: 1px solid var(--brand-slate); border-radius: 50%; }
@@ -87,7 +87,7 @@ label.check { display: flex; gap: 8px; align-items: center; color: var(--text); 
 .hud .grid { position: absolute; inset: 0; background-image: linear-gradient(to right, rgba(238,238,238,.09) 1px, transparent 1px), linear-gradient(to bottom, rgba(238,238,238,.09) 1px, transparent 1px); background-size: 25% 20%; }
 .hud .box { position: absolute; padding: 8px 10px; border: 1px solid rgba(238,238,238,.22); background: rgba(0,0,0,.5); line-height: 1.75; }
 .hud .tl { top: 46px; left: 10px; } .hud .tr { top: 46px; right: 10px; text-align: right; }
-.hud .bl { bottom: 24px; left: 10px; } .hud .br { bottom: 24px; right: 10px; text-align: right; }
+.hud .bl { bottom: 24px; left: 10px; } .hud .br { bottom: 24px; right: 54px; text-align: right; }
 .hud .box b { font-weight: 600; color: #fff; }
 .hud .box .bar { display: block; width: 14px; height: 1px; background: #fff; margin-top: 4px; }
 .hud .tr .bar, .hud .br .bar { margin-left: auto; }
@@ -165,3 +165,5 @@ ol li { margin: 6px 0; }
   body.print-plan main[data-view="plano"] { display: grid !important; }
   body.print-plan #planForm, body.print-plan .formtitle { display: none !important; }
 }
+.leaflet-top, .leaflet-bottom { z-index: 700; }
+@media (max-width: 860px) { .sub { display: none; } }

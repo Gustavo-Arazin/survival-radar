@@ -23,7 +23,9 @@
   };
 
   // ---------- mapa ----------
-  const map = L.map('map', { zoomControl: true }).setView([-15.78, -47.93], 4);
+  const map = L.map('map', { zoomControl: false }).setView([-15.78, -47.93], 4);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
   window.__srMap = map;
   // Camadas base: satélite (Esri) e vetorial (OpenStreetMap), ambas em monocromático via CSS.
   const BASES = {
