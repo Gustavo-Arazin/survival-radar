@@ -264,6 +264,8 @@
       const top = v.slice(0, 6);
       // Preserva as UTIs pediátrica e neonatal mais próximas mesmo fora das 6 primeiras.
       for (const f of ['utiPed', 'utiNeo']) { const x = v.find((y) => y[f] > 0); if (x && !top.includes(x)) top.push(x); }
+      // Barragens de porte (PNSB) não podem sumir atrás de lagos pequenos mais próximos.
+      if (k === 'dam') for (const x of v.filter((y) => y.official && SR.damBig(y)).slice(0, 8)) if (!top.includes(x)) top.push(x);
       o[k] = top;
     }
     return o;

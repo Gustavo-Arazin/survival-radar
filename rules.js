@@ -264,15 +264,17 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     return out.sort((a, b) => a.dist - b.dist);
   }
 
-  // Severidade de uma barragem para o endereço. ZAS (Zona de Autossalvamento): até 10 km a jusante ou 30 min de chegada da onda.
+  // Porte da barragem pelos critérios da Lei 12.334/2010 (PNSB): altura >= 15 m, volume >= 3 hm³, rejeito, ou DPA médio/alto.
+  function damBig(d) {
+    return /alto|m[eé]dio/i.test(d.dpa) || /rejeito|res[ií]duo/i.test(d.uso) || d.altura >= 15 || d.volume >= 3;
+  }
+  // Severidade para o endereço. ZAS (Zona de Autossalvamento): até 10 km a jusante ou 30 min de chegada da onda.
   function damLevel(d, below) {
-    const alto = /alto/i.test(d.dpa), medio = /m[eé]dio/i.test(d.dpa), sem = !d.dpa || /n[aã]o|indef|sem/i.test(d.dpa);
-    const rejeito = /rejeito|res[ií]duo/i.test(d.uso);
+    const grave = /alto/i.test(d.dpa) || /rejeito|res[ií]duo/i.test(d.uso);
+    if (!damBig(d)) return below === false ? null : d.dist < 3000 ? 'info' : null;
     if (below === false) return d.dist < 10000 ? 'info' : null;
-    if (d.dist < 10000 && (alto || rejeito)) return 'alto';
-    if (d.dist < 10000) return 'moderado';
-    if (d.dist < 30000 && (alto || rejeito)) return 'moderado';
-    if (d.dist < 30000 && (medio || sem)) return 'info';
+    if (d.dist < 10000) return grave ? 'alto' : 'moderado';
+    if (d.dist < 30000) return grave ? 'moderado' : 'info';
     return null;
   }
 
@@ -334,23 +336,21 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     if (dams.length) {
       const pt = ctx.elevation && ctx.elevation.point;
       const de = ctx.damElev || {};
-      let shown = 0;
-      for (const d of dams) {
-        if (shown >= 3) break;
+      const ranked = dams.map((d) => {
         const ze = de[d.snisb];
         const below = Number.isFinite(pt) && Number.isFinite(ze) ? pt < ze + 2 : null;
-        const lvl = damLevel(d, below);
-        if (!lvl) continue;
-        shown++;
+        return { d, ze, below, lvl: damLevel(d, below) };
+      }).filter((x) => x.lvl).sort((x, y) => (LEVEL_RANK[y.lvl] - LEVEL_RANK[x.lvl]) || (x.d.dist - y.d.dist)).slice(0, 3);
+      for (const { d, ze, below, lvl } of ranked) {
         const facts = [d.dpa && `dano potencial ${d.dpa.toLowerCase()}`, d.risco && `categoria de risco ${d.risco.toLowerCase()}`,
           Number.isFinite(d.altura) && d.altura > 0 && `altura ${String(d.altura).replace('.', ',')} m`,
           Number.isFinite(d.volume) && d.volume > 0 && `volume ${String(d.volume).replace('.', ',')} hm³`,
           d.uso && d.uso.toLowerCase(), d.rio && `rio ${d.rio}`].filter(Boolean).join(' · ');
         const cota = below === true ? ` O endereço está ${Math.max(0, Math.round(ze - pt))} m abaixo da cota do terreno da barragem: compatível com estar a jusante.`
           : below === false ? ' O endereço está acima da cota do terreno da barragem: improvável estar na mancha de inundação.' : '';
-        const pae = /sim/i.test(d.pae) ? ' A barragem tem PAE: peça ao empreendedor ou à Defesa Civil o mapa da mancha de inundação e a rota de fuga.'
+        const pae = !damBig(d) ? ' Pequeno porte, fora dos critérios da Política Nacional de Segurança de Barragens: risco local de transbordamento, não de onda de rompimento.' : /sim/i.test(d.pae) ? ' A barragem tem PAE: peça ao empreendedor ou à Defesa Civil o mapa da mancha de inundação e a rota de fuga.'
           : ' O SNISB não registra PAE para ela: peça à Defesa Civil a avaliação do vale a jusante.';
-        add(lvl, `Barragem (SNISB) a ${fmtDist(d.dist)}`, `${d.name}${d.munic ? ' (' + d.munic + ')' : ''}. ${facts ? facts.charAt(0).toUpperCase() + facts.slice(1) + '.' : 'Cadastro sem classificação de dano potencial.'}${cota}${d.dist < 10000 ? ' Até 10 km a jusante é Zona de Autossalvamento: em rompimento não há tempo para alerta oficial, a saída é a pé para o alto.' : ''}${pae}`);
+        add(lvl, `Barragem (SNISB) a ${fmtDist(d.dist)}`, `${d.name}${d.munic ? ' (' + d.munic + ')' : ''}. ${facts ? facts.charAt(0).toUpperCase() + facts.slice(1) + '.' : 'Cadastro sem classificação de dano potencial.'}${cota}${d.dist < 10000 && damBig(d) ? ' Até 10 km a jusante é Zona de Autossalvamento: em rompimento não há tempo para alerta oficial, a saída é a pé para o alto.' : ''}${pae}`);
       }
       const extra = (it.dam || []).find((d) => !d.official && d.dist < 10000);
       if (extra) add('moderado', `Barragem a ${fmtDist(extra.dist)}`, `${extra.name}. Fora do cadastro SNISB (fonte: OpenStreetMap), sem classificação oficial. Se o endereço estiver a jusante, pode estar na Zona de Autossalvamento. Confirme com a Defesa Civil.`);
@@ -475,7 +475,7 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     ].join('\n');
   }
 
-  const api = { fromSnisb, damLevel, haversine, distToSegment, distToPolyline, point, median, classify, buildOverpassQuery, parseOverpass, radiusFor, tilesFor, fromTiles, fromCnes, geoRiskFrom, inRing, MAX_RADIUS, evaluate, recommend, reportText, aiBriefing, fmtDist, CATEGORIES, LEVEL_RANK };
+  const api = { fromSnisb, damLevel, damBig, haversine, distToSegment, distToPolyline, point, median, classify, buildOverpassQuery, parseOverpass, radiusFor, tilesFor, fromTiles, fromCnes, geoRiskFrom, inRing, MAX_RADIUS, evaluate, recommend, reportText, aiBriefing, fmtDist, CATEGORIES, LEVEL_RANK };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SR = api;
 })(typeof self !== 'undefined' ? self : this);
