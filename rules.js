@@ -242,10 +242,38 @@ way(around:3000,${c})[man_made=pipeline]->.p;
       const cat = CNES_HOSP.includes(r[5]) ? 'hospital' : CNES_URG.includes(r[5]) ? 'emergency' : null;
       if (!cat) continue;
       out[cat].push({ cat, lat: r[0], lon: r[1], dist, name: r[2] || SINGULAR[cat], phone: r[3] || null, address: r[4] || null,
-        tipo: (tipos && tipos[r[5]]) || '', h24: !!(r[6] & 1), obst: !!(r[6] & 2), neo: !!(r[6] & 4), ped: !!(r[6] & 8), sus: !!(r[6] & 16), osm: 'cnes/' + r[7], official: true });
+        tipo: (tipos && tipos[r[5]]) || '', h24: !!(r[6] & 1), obst: !!(r[6] & 2), neo: !!(r[6] & 4), ped: !!(r[6] & 8), sus: !!(r[6] & 16), utiPed: (r[8] && r[8][0]) || ((r[6] & 32) ? 1 : 0), utiNeo: (r[8] && r[8][1]) || ((r[6] & 64) ? 1 : 0),
+        osm: 'cnes/' + r[7], official: true });
     }
     out.hospital.sort((a, b) => a.dist - b.dist); out.emergency.sort((a, b) => a.dist - b.dist);
     return out;
+  }
+
+  // Barragens do SNISB -> itens 'dam' com classificação oficial; funde com as do OSM sem duplicar (1 km).
+  function fromSnisb(rows, origin, maxR, osmDams) {
+    const out = [], seen = new Set();
+    for (const r of rows) {
+      if (seen.has(r[14])) continue; seen.add(r[14]);
+      const dist = haversine(origin, { lat: r[0], lon: r[1] });
+      if (dist > maxR) continue;
+      out.push({ cat: 'dam', lat: r[0], lon: r[1], dist, name: r[2] || 'Barragem', official: true, snisb: r[14],
+        risco: r[3] || '', dpa: r[4] || '', altura: r[5], volume: r[6], uso: r[7] || '', pae: r[8] || '', munic: r[9] || '',
+        empreendedor: r[10] || '', fiscal: r[11] || '', rio: r[12] || '', fase: r[13] || '', perigo: r[15] || '', pnsb: r[16] || '' });
+    }
+    for (const d of osmDams || []) if (!out.some((x) => haversine(x, d) < 1000)) out.push(d);
+    return out.sort((a, b) => a.dist - b.dist);
+  }
+
+  // Severidade de uma barragem para o endereço. ZAS (Zona de Autossalvamento): até 10 km a jusante ou 30 min de chegada da onda.
+  function damLevel(d, below) {
+    const alto = /alto/i.test(d.dpa), medio = /m[eé]dio/i.test(d.dpa), sem = !d.dpa || /n[aã]o|indef|sem/i.test(d.dpa);
+    const rejeito = /rejeito|res[ií]duo/i.test(d.uso);
+    if (below === false) return d.dist < 10000 ? 'info' : null;
+    if (d.dist < 10000 && (alto || rejeito)) return 'alto';
+    if (d.dist < 10000) return 'moderado';
+    if (d.dist < 30000 && (alto || rejeito)) return 'moderado';
+    if (d.dist < 30000 && (medio || sem)) return 'info';
+    return null;
   }
 
   // Setores de risco do SGB: dentro de algum? qual o mais próximo?
@@ -302,10 +330,36 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     if (ap && ap.dist < 2000) add('moderado', `Aeroporto ou aeródromo a ${fmtDist(ap.dist)}`, `${ap.name}. Proximidade de rota de pouso e decolagem e de infraestrutura estratégica.`);
     const mil = first('military');
     if (mil && mil.dist < 2000) add('moderado', `Área militar a ${fmtDist(mil.dist)}`, `${mil.name}. Em conflito ou grave perturbação, entorno de instalações militares é área de restrição e de maior exposição.`);
-    const dam = first('dam');
-    if (dam) {
-      if (dam.dist < 10000) add('moderado', `Barragem a ${fmtDist(dam.dist)}`, `${dam.name}. Se o endereço estiver a jusante (rio abaixo), pode estar na Zona de Autossalvamento. Verifique no SNISB e no plano de emergência da barragem.`);
-      else add('info', `Barragem a ${fmtDist(dam.dist)}`, `${dam.name}. Verifique se o endereço está a jusante e a que distância pelo curso do rio.`);
+    const dams = (it.dam || []).filter((d) => d.official);
+    if (dams.length) {
+      const pt = ctx.elevation && ctx.elevation.point;
+      const de = ctx.damElev || {};
+      let shown = 0;
+      for (const d of dams) {
+        if (shown >= 3) break;
+        const ze = de[d.snisb];
+        const below = Number.isFinite(pt) && Number.isFinite(ze) ? pt < ze + 2 : null;
+        const lvl = damLevel(d, below);
+        if (!lvl) continue;
+        shown++;
+        const facts = [d.dpa && `dano potencial ${d.dpa.toLowerCase()}`, d.risco && `categoria de risco ${d.risco.toLowerCase()}`,
+          Number.isFinite(d.altura) && d.altura > 0 && `altura ${String(d.altura).replace('.', ',')} m`,
+          Number.isFinite(d.volume) && d.volume > 0 && `volume ${String(d.volume).replace('.', ',')} hm³`,
+          d.uso && d.uso.toLowerCase(), d.rio && `rio ${d.rio}`].filter(Boolean).join(' · ');
+        const cota = below === true ? ` O endereço está ${Math.max(0, Math.round(ze - pt))} m abaixo da cota do terreno da barragem: compatível com estar a jusante.`
+          : below === false ? ' O endereço está acima da cota do terreno da barragem: improvável estar na mancha de inundação.' : '';
+        const pae = /sim/i.test(d.pae) ? ' A barragem tem PAE: peça ao empreendedor ou à Defesa Civil o mapa da mancha de inundação e a rota de fuga.'
+          : ' O SNISB não registra PAE para ela: peça à Defesa Civil a avaliação do vale a jusante.';
+        add(lvl, `Barragem (SNISB) a ${fmtDist(d.dist)}`, `${d.name}${d.munic ? ' (' + d.munic + ')' : ''}. ${facts ? facts.charAt(0).toUpperCase() + facts.slice(1) + '.' : 'Cadastro sem classificação de dano potencial.'}${cota}${d.dist < 10000 ? ' Até 10 km a jusante é Zona de Autossalvamento: em rompimento não há tempo para alerta oficial, a saída é a pé para o alto.' : ''}${pae}`);
+      }
+      const extra = (it.dam || []).find((d) => !d.official && d.dist < 10000);
+      if (extra) add('moderado', `Barragem a ${fmtDist(extra.dist)}`, `${extra.name}. Fora do cadastro SNISB (fonte: OpenStreetMap), sem classificação oficial. Se o endereço estiver a jusante, pode estar na Zona de Autossalvamento. Confirme com a Defesa Civil.`);
+    } else {
+      const dam = first('dam');
+      if (dam) {
+        if (dam.dist < 10000) add('moderado', `Barragem a ${fmtDist(dam.dist)}`, `${dam.name}. Fora do cadastro SNISB (fonte: OpenStreetMap). Se o endereço estiver a jusante (rio abaixo), pode estar na Zona de Autossalvamento. Confirme com a Defesa Civil.`);
+        else add('info', `Barragem a ${fmtDist(dam.dist)}`, `${dam.name}. Fora do cadastro SNISB. Verifique se o endereço está a jusante e a que distância pelo curso do rio.`);
+      }
     }
 
     // Relevo: ponto mais baixo que o entorno acumula água.
@@ -331,9 +385,15 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     else if (hosp.dist > 10000) add('moderado', `Atendimento de urgência mais próximo a ${fmtDist(hosp.dist)}`, `${hosp.name}. Distância alta para emergência; planeje transporte e teste o trajeto.`);
     else add('baixo', `Atendimento de urgência a ${fmtDist(hosp.dist)}`, hosp.name);
 
-    const ped = [...(it.hospital || []), ...(it.emergency || [])].filter((x) => x.ped).sort((a, b) => a.dist - b.dist)[0];
-    if (ped) add('info', `Atendimento pediátrico a ${fmtDist(ped.dist)}`, `${ped.name}${ped.h24 ? ' · 24 h' : ''}. Indício pelo nome no CNES: confirme por telefone.`);
-    else if ((ctx.profile || {}).infants > 0 && (it.hospital || []).some((x) => x.official)) add('moderado', 'Nenhuma unidade pediátrica identificada no raio', 'O CNES não indica pediatria pelo nome das unidades próximas. Confirme com o plano de saúde qual pronto-socorro atende crianças.');
+    const allH = [...(it.hospital || []), ...(it.emergency || [])];
+    const utiPed = allH.filter((x) => x.utiPed > 0).sort((a, b) => a.dist - b.dist)[0];
+    const utiNeo = allH.filter((x) => x.utiNeo > 0).sort((a, b) => a.dist - b.dist)[0];
+    const ped = allH.filter((x) => x.ped).sort((a, b) => a.dist - b.dist)[0];
+    const kidsP = (p.infants || 0) + (p.kids || 0);
+    if (utiPed) add('info', `UTI pediátrica a ${fmtDist(utiPed.dist)}`, `${utiPed.name}: ${utiPed.utiPed} leito(s) de UTI pediátrica cadastrados no CNES${utiPed.h24 ? ' · 24 h' : ''}. Dado oficial de leitos; confirme por telefone se o pronto-socorro recebe criança.`);
+    else if (allH.some((x) => x.official)) add(kidsP > 0 ? 'moderado' : 'info', 'Nenhuma UTI pediátrica no raio', 'O cadastro de leitos do CNES não registra UTI pediátrica nos hospitais do raio pesquisado. Identifique a mais próxima ampliando o raio e combine com o plano de saúde.');
+    if (utiNeo && (p.infants || 0) > 0) add('info', `UTI neonatal a ${fmtDist(utiNeo.dist)}`, `${utiNeo.name}: ${utiNeo.utiNeo} leito(s) de UTI neonatal cadastrados no CNES.`);
+    if (ped && (!utiPed || ped.dist < utiPed.dist)) add('info', `Atendimento pediátrico a ${fmtDist(ped.dist)}`, `${ped.name}${ped.h24 ? ' · 24 h' : ''}. Indício pelo nome no CNES (sem UTI pediátrica cadastrada): confirme por telefone.`);
 
     const fire = first('fire');
     if (!fire) add('moderado', `Nenhum quartel de bombeiros em ${rLabel}`, 'Pode ser lacuna de dados. Tempo de resposta a incêndio tende a ser maior.');
@@ -356,11 +416,12 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     a.push('Cadastre o CEP deste local na Defesa Civil: envie o CEP por SMS para 40199.');
     const hosp = [(it.hospital || [])[0], (it.emergency || [])[0]].filter(Boolean).sort((x, y) => x.dist - y.dist);
     if (hosp.length) a.push(`Faça uma vez, em horário de pico, o trajeto até ${hosp[0].name} e anote o tempo real.`);
-    if (p.infants > 0 || p.kids > 0) a.push('Confirme por telefone ou com o plano de saúde quais destes hospitais têm pronto-socorro pediátrico 24 h. O mapa não traz essa informação.');
+    if (p.infants > 0 || p.kids > 0) a.push('Ligue para os dois hospitais com UTI pediátrica mais próximos e confirme se o pronto-socorro recebe criança 24 h e se aceita o seu plano. O cadastro mostra leitos, não o plantão do dia.');
     if (p.elderly > 0 || p.mobility) a.push('Defina quem ajuda na saída de quem tem mobilidade reduzida e onde fica a cadeira de rodas ou o andador.');
     if (p.meds) a.push('Medicação ou equipamento elétrico: mantenha 30 dias de margem de medicação e energia de reserva (estação portátil) para o equipamento.');
     if (p.pets) a.push('Inclua os animais no plano de saída: caixa de transporte, ração e água para 3 dias.');
     if (lv(/Refinaria|química|Depósito|Duto|nuclear/i)) a.push('Planeje abrigo no local para vazamento tóxico: um cômodo com poucas janelas, fita e plástico para vedar, rádio a pilha.');
+    if (lv(/Ponto baixo|Barragem/i)) a.push('Para cada barragem listada, peça o PAE (mapa da mancha de inundação e rotas de fuga) ao empreendedor ou à Defesa Civil; se negarem, protocole pedido pela Lei de Acesso à Informação.');
     if (lv(/Ponto baixo|Barragem/i)) a.push('Defina um ponto alto de refúgio a pé (andar alto de prédio de parente ou área elevada) e a rota até ele.');
     if (lv(/Bombeiros/i)) a.push('Tenha extintor ABC em casa e saiba usar. Revise a validade anualmente.');
     a.push('Salve este relatório neste aparelho para consulta offline e imprima uma cópia para a bolsa de emergência.');
@@ -414,7 +475,7 @@ way(around:3000,${c})[man_made=pipeline]->.p;
     ].join('\n');
   }
 
-  const api = { haversine, distToSegment, distToPolyline, point, median, classify, buildOverpassQuery, parseOverpass, radiusFor, tilesFor, fromTiles, fromCnes, geoRiskFrom, inRing, MAX_RADIUS, evaluate, recommend, reportText, aiBriefing, fmtDist, CATEGORIES, LEVEL_RANK };
+  const api = { fromSnisb, damLevel, haversine, distToSegment, distToPolyline, point, median, classify, buildOverpassQuery, parseOverpass, radiusFor, tilesFor, fromTiles, fromCnes, geoRiskFrom, inRing, MAX_RADIUS, evaluate, recommend, reportText, aiBriefing, fmtDist, CATEGORIES, LEVEL_RANK };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SR = api;
 })(typeof self !== 'undefined' ? self : this);

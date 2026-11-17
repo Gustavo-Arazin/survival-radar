@@ -32,3 +32,26 @@ const ev2 = SR.evaluate({ items: { ...cn }, radius: 10000, geoRisk: gr, profile:
 if (!ev2.findings.some(f => /setor de risco geológico/.test(f.title) && f.level === 'alto')) throw new Error('eval sgb');
 if (!ev2.findings.some(f => /pediátrico/.test(f.title))) throw new Error('eval ped');
 console.log('CNES/SGB OK', ev2.findings.map(f=>f.level+' '+f.title));
+
+// SNISB e leitos
+const sn = [
+  [-23.60, -46.6559, 'Barragem Alta', 'Alto', 'Alto', 25, 12.5, 'Contenção de rejeitos de mineração', 'Sim', 'X-SP', 'Mina SA', 'ANM', 'Rio A', 'Operação', 101, '', 'Sim'],
+  [-23.75, -46.6559, 'Açude Médio', 'Baixo', 'Médio', 8, 0.4, 'Irrigação', 'Não', 'Y-SP', '', 'DAEE', '', '', 102, '', ''],
+  [-23.60, -46.6559, 'Barragem Alta', 'Alto', 'Alto', 25, 12.5, '', 'Sim', 'X-SP', '', '', '', '', 101, '', ''],
+];
+const osmDam = [{ cat: 'dam', lat: -23.6005, lon: -46.6559, dist: 4300, name: 'Dup OSM' }, { cat: 'dam', lat: -23.40, lon: -46.70, dist: 18000, name: 'Só OSM' }];
+const dams = SR.fromSnisb(sn, o, 30000, osmDam);
+if (dams.length !== 3 || !dams[0].official || dams.some(d => d.name === 'Dup OSM')) throw new Error('fromSnisb ' + JSON.stringify(dams.map(d => d.name)));
+const ev3 = SR.evaluate({ items: { dam: dams }, radius: 10000, elevation: { point: 700, ring: [705, 702, 701, 700, 699, 703, 704, 702] }, damElev: { 101: 760 }, profile: {} });
+const f1 = ev3.findings.find(f => /Barragem Alta/.test(f.detail));
+if (!f1 || f1.level !== 'alto' || !/abaixo da cota/.test(f1.detail) || !/Autossalvamento/.test(f1.detail)) throw new Error('dam alto ' + JSON.stringify(f1));
+const ev4 = SR.evaluate({ items: { dam: dams }, radius: 10000, elevation: { point: 800, ring: [800, 800, 800, 800, 800, 800, 800, 800] }, damElev: { 101: 760 }, profile: {} });
+const f2 = ev4.findings.find(f => /Barragem Alta/.test(f.detail));
+if (!f2 || f2.level !== 'info' || !/acima da cota/.test(f2.detail)) throw new Error('dam acima ' + JSON.stringify(f2));
+const leit = SR.fromCnes([[-23.57, -46.66, 'Hosp Ped', '', '', 5, 1 | 32 | 64, '9', [6, 10, 120]], [-23.565, -46.656, 'Hosp Geral', '', '', 5, 1, '8', []]], o, 10000, {});
+const ev5 = SR.evaluate({ items: leit, radius: 10000, profile: { infants: 1 } });
+if (!ev5.findings.some(f => /UTI pediátrica a/.test(f.title) && /6 leito/.test(f.detail))) throw new Error('uti ped');
+if (!ev5.findings.some(f => /UTI neonatal a/.test(f.title))) throw new Error('uti neo');
+const ev6 = SR.evaluate({ items: SR.fromCnes([[-23.565, -46.656, 'Hosp Geral', '', '', 5, 1, '8', []]], o, 10000, {}), radius: 10000, profile: { infants: 1 } });
+if (!ev6.findings.some(f => /Nenhuma UTI pediátrica/.test(f.title) && f.level === 'moderado')) throw new Error('sem uti ped');
+console.log('SNISB/Leitos OK', ev3.findings.map(f => f.level + ' ' + f.title));

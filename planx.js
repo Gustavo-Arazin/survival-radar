@@ -146,6 +146,13 @@
     add('Casa', 'cep', 'CEP de cada imóvel cadastrado na Defesa Civil (SMS 40199)');
     add('Casa', 'utilidades', 'Todos os adultos sabem fechar gás e água e desligar o disjuntor geral');
     add('Casa', 'exercicio', 'Exercício de saída feito com as crianças (tempo cronometrado)');
+    // Verificações de campo: o que nenhuma base pública responde.
+    const props0 = (h.properties && h.properties.length) ? h.properties : [];
+    const finds = props0.flatMap((p) => ((p.analysis && p.analysis.findings) || []).map((f) => f.title || ''));
+    if (kids.length) add('Saúde', 'tel-uti', 'Ligação feita aos dois hospitais com UTI pediátrica mais próximos: confirmado se o PS recebe criança 24 h e aceita o plano');
+    if (finds.some((t) => /Barragem/i.test(t))) add('Casa', 'pae', 'PAE de cada barragem próxima pedido (empreendedor ou Defesa Civil); se negado, pedido protocolado pela Lei de Acesso à Informação');
+    if (finds.some((t) => /Barragem/i.test(t))) add('Casa', 'zas', 'Confirmado se o imóvel está na mancha de inundação ou na Zona de Autossalvamento; rota a pé até ponto alto definida');
+    add('Casa', 'vistoria', 'Vistoria única do imóvel principal por engenheiro ou geólogo (drenagem, encosta, estrutura), com laudo arquivado');
 
     // 5. Revisões e marcos das crianças
     const rv = h.reviews || {};

@@ -134,10 +134,11 @@
     if (!idx) return null;
     const have = new Set(idx.tiles);
     const keys = SR.tilesFor(lat, lon, SR.MAX_RADIUS, idx.tile).filter((k) => have.has(k));
-    const [parts, cnes, sgb] = await Promise.all([
+    const [parts, cnes, sgb, snisb] = await Promise.all([
       Promise.all(keys.map((k) => fetchJSON(`data/t/${k}.json?b=${encodeURIComponent(idx.built)}`, {}, 30000).catch(() => []))),
       officialRows('cnes', lat, lon, radius),
       officialRows('sgb', lat, lon, 3000),
+      officialRows('snisb', lat, lon, 30000),
     ]);
     const items = SR.fromTiles(parts.flat(), { lat, lon }, radius, idx.cats);
     const sources = { osm: idx.built };
@@ -146,6 +147,11 @@
       if (c.hospital.length) items.hospital = c.hospital;
       if (c.emergency.length) items.emergency = c.emergency;
       sources.cnes = cnes.idx.built;
+    }
+    if (snisb) {
+      const d = SR.fromSnisb(snisb.rows, { lat, lon }, 30000, items.dam);
+      if (d.length) items.dam = d;
+      sources.snisb = snisb.idx.built;
     }
     let geoRisk = null;
     if (sgb) { geoRisk = SR.geoRiskFrom(sgb.rows, { lat, lon }); sources.sgb = sgb.idx.built; }
@@ -159,6 +165,15 @@
     const j = await fetchJSON(url, {}, 15000);
     const e = j.elevation || [];
     return { point: e[0], ring: e.slice(1) };
+  }
+
+  // Cota do terreno das barragens oficiais mais próximas (até 4), para estimar se o endereço está abaixo delas.
+  async function damElevations(dams) {
+    const list = (dams || []).filter((d) => d.official && d.dist < 30000).slice(0, 4);
+    if (!list.length) return {};
+    const url = `${ELEVATION}?latitude=${list.map((d) => d.lat.toFixed(5)).join(',')}&longitude=${list.map((d) => d.lon.toFixed(5)).join(',')}`;
+    const j = await fetchJSON(url, {}, 15000);
+    return Object.fromEntries(list.map((d, i) => [d.snisb, (j.elevation || [])[i]]).filter(([, v]) => Number.isFinite(v)));
   }
 
   async function reverse(lat, lon) {
@@ -228,8 +243,10 @@
       try { items = SR.parseOverpass(await overpass(SR.buildOverpassQuery(lat, lon, radius)), { lat, lon }); }
       catch { status('Os servidores do OpenStreetMap estão ocupados. Tente de novo em alguns minutos.'); return; }
     }
+    let damElev = {};
+    try { damElev = await damElevations(items.dam); } catch { damElev = {}; }
     current = {
-      dataBuilt: built, geoRisk, sources,
+      dataBuilt: built, geoRisk, sources, damElev,
       name: $('placeName').value.trim() || 'Local',
       address: addr.status === 'fulfilled' ? addr.value : null,
       lat, lon, radius, ts: Date.now(),
@@ -243,7 +260,12 @@
 
   function trim(items) {
     const o = {};
-    for (const [k, v] of Object.entries(items)) o[k] = v.slice(0, 6);
+    for (const [k, v] of Object.entries(items)) {
+      const top = v.slice(0, 6);
+      // Preserva as UTIs pediátrica e neonatal mais próximas mesmo fora das 6 primeiras.
+      for (const f of ['utiPed', 'utiNeo']) { const x = v.find((y) => y[f] > 0); if (x && !top.includes(x)) top.push(x); }
+      o[k] = top;
+    }
     return o;
   }
 
@@ -308,7 +330,7 @@
       if (!list.length) return group === 'service' ? `<div class="cat"><h3><i style="background:${c.color}"></i>${c.label}</h3><p class="muted small">Nada encontrado no raio. Pode ser lacuna de dados.</p></div>` : '';
       return `<div class="cat"><h3><i style="background:${c.color}"></i>${c.label}</h3><ul>${list.map((x) => `
         <li><div><b>${esc(nw(x.name))}</b> <span class="muted">·&nbsp;${SR.fmtDist(x.dist).replace(' ', '&nbsp;')}</span>
-        ${x.official ? `<br><span class="badges">${[x.tipo, x.h24 && '24 h', x.ped && 'pediátrico (nome)', x.obst && 'maternidade', x.neo && 'neonatal', x.sus && 'SUS'].filter(Boolean).map((b) => `<span class="badge">${esc(b)}</span>`).join('')}</span>` : ''}
+        ${x.official ? `<br><span class="badges">${(x.cat === 'dam' ? [x.dpa && `DPA ${x.dpa.toLowerCase()}`, x.risco && `risco ${x.risco.toLowerCase()}`, /sim/i.test(x.pae) && 'tem PAE', x.uso, 'SNISB'] : [x.tipo, x.h24 && '24 h', x.utiPed > 0 && `UTI pediátrica (${x.utiPed})`, x.utiNeo > 0 && `UTI neonatal (${x.utiNeo})`, x.ped && !(x.utiPed > 0) && 'pediátrico (nome)', x.obst && 'maternidade', x.neo && !(x.utiNeo > 0) && 'neonatal', x.sus && 'SUS']).filter(Boolean).map((b) => `<span class="badge">${esc(b)}</span>`).join('')}</span>` : ''}
         ${x.address ? `<br><span class="muted small">${esc(x.address)}</span>` : ''}
         ${x.phone ? `<br><span class="small">${esc(x.phone)}</span>` : ''}</div>
         <div class="links"><a href="${gmaps(m, x, 'driving')}" target="_blank" rel="noopener">Carro</a>
@@ -324,9 +346,9 @@
     q.push(`${svc} serviços de emergência mapeados no raio de ${SR.fmtDist(m.radius)}.`);
     q.push(m.dataBuilt ? `Base nacional OpenStreetMap atualizada em ${new Date(m.dataBuilt).toLocaleDateString('pt-BR')}.` : 'Dados consultados ao vivo no OpenStreetMap.');
     const src = m.sources || {};
-    q.push(src.cnes ? `Hospitais e prontos-socorros: CNES (Ministério da Saúde), base de ${new Date(src.cnes).toLocaleDateString('pt-BR')}. "Pediátrico" é indício pelo nome; confirme por telefone.` : 'Hospitais: OpenStreetMap (CNES indisponível nesta consulta).');
+    q.push(src.cnes ? `Hospitais e prontos-socorros: CNES (Ministério da Saúde), base de ${new Date(src.cnes).toLocaleDateString('pt-BR')}. UTI pediátrica e neonatal vêm do cadastro oficial de leitos; "pediátrico (nome)" é só indício. Plantão do dia: confirme por telefone.` : 'Hospitais: OpenStreetMap (CNES indisponível nesta consulta).');
     q.push(src.sgb ? `Áreas de risco geológico: Serviço Geológico do Brasil, base de ${new Date(src.sgb).toLocaleDateString('pt-BR')}. Só municípios mapeados pelo SGB.` : 'Áreas de risco geológico oficiais indisponíveis nesta consulta.');
-    q.push('Barragens: OpenStreetMap, sem a classificação oficial de risco (o SNISB não publica base consultável).');
+    q.push(src.snisb ? `Barragens: SNISB (ANA), base de ${new Date(src.snisb).toLocaleDateString('pt-BR')}, com dano potencial, categoria de risco e PAE; complementado pelo OpenStreetMap. A mancha de inundação não é pública: peça o PAE. "Abaixo da cota" é estimativa por altitude, não traçado do vale.` : 'Barragens: OpenStreetMap, sem classificação oficial (SNISB indisponível nesta consulta).');
     if (svc < 3) q.push('Poucos serviços mapeados: a cobertura do OpenStreetMap nesta região pode ser fraca. Confirme localmente.');
     q.push(m.elevation ? 'Relevo: dados de altitude obtidos (Open-Meteo, ~90 m de resolução).' : 'Relevo: altitude indisponível nesta consulta.');
     $('quality').innerHTML = q.map((x) => `<li>${esc(nw(x))}</li>`).join('');
