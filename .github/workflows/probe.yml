@@ -1,0 +1,29 @@
+name: probe
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import urllib.request, json, zipfile, io, csv
+          UA={'User-Agent':'survival-radar-probe'}
+          def get(u,t=300): return urllib.request.urlopen(urllib.request.Request(u,headers=UA),timeout=t).read()
+          for base in ['https://www.snirh.gov.br/arcgis/rest/services/IG/SNISB/FeatureServer/0']:
+            try:
+              m=json.loads(get(base+'?f=json'))
+              print('SNISB fields:', [(f['name'],f.get('alias')) for f in m.get('fields',[])])
+              print('maxRecordCount', m.get('maxRecordCount'), 'geom', m.get('geometryType'))
+              print('count', get(base+'/query?where=1%3D1&returnCountOnly=true&f=json'))
+              print('sample', get(base+'/query?where=1%3D1&outFields=*&resultRecordCount=2&outSR=4326&f=json')[:3000])
+            except Exception as e: print('SNISB ERR', e)
+          try:
+            raw=get('https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/Leitos_SUS/Leitos_csv_2026.zip')
+            z=zipfile.ZipFile(io.BytesIO(raw)); print('LEITOS files', z.namelist())
+            n=[x for x in z.namelist() if x.lower().endswith('.csv')][0]
+            txt=io.TextIOWrapper(z.open(n),encoding='latin-1')
+            for i,l in enumerate(txt):
+              print(l.strip()[:1500])
+              if i>=3: break
+          except Exception as e: print('LEITOS ERR', e)
+          PY
