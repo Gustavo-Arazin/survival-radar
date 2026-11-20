@@ -1,16 +1,16 @@
 [hidden] { display: none !important; }
 /* Survival Radar — identidade visual do ΛＲＺＮ OpSys (Brandbook v1.0).
  * Preto é o canvas, cinza cria estrutura, azul cria ação, neon é estado.
- * Montserrat é a única família. Cartões tonais com linha fina, sem sombra nem gradiente. */
+ * Inter é a única família (Brandbook v1.1). Cartões tonais com linha fina, sem sombra nem gradiente. */
 
 @font-face {
-  font-family: "Montserrat"; font-style: normal; font-display: swap; font-weight: 100 900;
-  src: url("fonts/montserrat-latin-wght-normal.woff2") format("woff2-variations"), url("fonts/montserrat-latin-wght-normal.woff2") format("woff2");
+  font-family: "Inter"; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url("fonts/inter-latin-wght-normal.woff2") format("woff2-variations"), url("fonts/inter-latin-wght-normal.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "Montserrat"; font-style: normal; font-display: swap; font-weight: 100 900;
-  src: url("fonts/montserrat-latin-ext-wght-normal.woff2") format("woff2-variations"), url("fonts/montserrat-latin-ext-wght-normal.woff2") format("woff2");
+  font-family: "Inter"; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url("fonts/inter-latin-ext-wght-normal.woff2") format("woff2-variations"), url("fonts/inter-latin-ext-wght-normal.woff2") format("woff2");
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2C60-2C7F, U+A720-A7FF;
 }
 
@@ -20,7 +20,7 @@
   --brand-action-blue: #0078d4; --brand-interactive-blue: #63b0fd; --brand-data-teal: #0097a7; --brand-signal-gold: #ffab40;
   --brand-neon-core: #eaf8ff; --brand-neon-edge: #63b0fd; --brand-neon-cyan: #24cbe5; --brand-neon-halo: #4285f4;
   --brand-line: #383838; --brand-control: #777777;
-  --brand-font: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --brand-font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --ease-brand: cubic-bezier(0.2, 0, 0, 1);
   --bg: var(--brand-near-black); --panel: var(--brand-graphite); --surface: var(--brand-carbon); --line: var(--brand-line);
   --text: var(--brand-off-white); --muted: var(--brand-silver); --accent: var(--brand-interactive-blue); --action: var(--brand-action-blue);
